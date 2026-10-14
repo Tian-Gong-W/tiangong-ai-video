@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tiangong}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tiangong}
+      POSTGRES_DB: ${POSTGRES_DB:-tiangong}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-tiangong}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # 一次性迁移容器：docker compose --profile tools run --rm migrate
+  migrate:
+    build:
+      context: .
+      target: migrate
+    profiles: ["tools"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-tiangong}:${POSTGRES_PASSWORD:-tiangong}@db:5432/${POSTGRES_DB:-tiangong}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-tiangong}:${POSTGRES_PASSWORD:-tiangong}@db:5432/${POSTGRES_DB:-tiangong}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
