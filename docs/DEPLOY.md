@@ -5,7 +5,8 @@
 - **app**：Next.js 15 `standalone` 产物，多阶段 Docker 构建，非 root 运行，容器内监听 3000
 - **db**：PostgreSQL 16（alpine），数据落在 named volume `pgdata`，不对公网暴露端口
 - **migrate**：一次性容器，执行 `pnpm db:push` 同步 Drizzle schema；挂 `tools` profile，`docker compose up -d` 不会启动它
-- **CI**：push 到 `Top-Men` → GitHub Actions 经 SSH 登录服务器 → 拉代码 → 构建镜像 → 迁移 → 重启
+- **seed**：一次性容器，导入 `scripts/seed-templates.json`（60 条参考站选品模板）到 templates 表；幂等 upsert，已粘贴真实工作流的模板不会被覆盖
+- **CI**：push 到 `Top-Men` → GitHub Actions 经 SSH 登录服务器 → 拉代码 → 构建镜像 → 迁移+种子 → 重启
 
 ComfyUI GPU 侧（RunPod Serverless / 自托管）不在本 compose 内，见 `worker/README.md` 与 `docs/COMFYUI-INTEGRATION.md`。
 
@@ -49,9 +50,12 @@ cp .env.example .env
 docker compose build app
 docker compose up -d db
 docker compose --profile tools run --rm migrate
+docker compose --profile tools run --rm seed
 docker compose up -d app
 curl -I http://127.0.0.1:3000   # 期望 200/30x
 ```
+
+打开 `/templates` 即可看到 60 个种子模板卡片（风格/特效/LoRA 照片/视频/电影）。
 
 生产建议在 app 前面挂 Nginx/Caddy 反代 + 域名 + TLS（RunPod worker 回调要求公网 https 地址）。
 
@@ -73,7 +77,7 @@ curl -I http://127.0.0.1:3000   # 期望 200/30x
 1. 按 `worker/README.md` 构建镜像并创建 RunPod Serverless endpoint
 2. endpoint id 填入 `.env` 的 `COMFYUI_API_URL`
 3. `docker compose up -d app` 重启生效
-4. 在后台管理（/admin/templates）录入 ComfyUI **API 格式**导出的工作流 JSON（含 `<%seed%>` 等占位符），前台模板目录即可选模板出片
+4. ⚠️ 种子模板的 `workflowJson` 是**占位骨架**（仅保证页面/积分/目录展示正常）；真实出片前，在后台管理（`/admin/templates`）为每个模板粘贴带 LoRA 的完整 ComfyUI API 格式工作流 JSON（含 `<%seed%>` 等占位符），种子脚本不会覆盖你粘贴过的内容
 
 ## 四、日常运维
 
@@ -81,6 +85,7 @@ curl -I http://127.0.0.1:3000   # 期望 200/30x
 docker compose logs -f app                        # 应用日志
 docker compose restart app                        # 重启应用
 docker compose --profile tools run --rm migrate   # schema 变更后手动迁移
+docker compose --profile tools run --rm seed      # 模板种子变更后重新导入（幂等）
 docker compose exec db psql -U tiangong           # 进数据库
 docker compose exec db pg_dump -U tiangong tiangong > backup.sql  # 备份
 ```
@@ -89,5 +94,7 @@ docker compose exec db pg_dump -U tiangong tiangong > backup.sql  # 备份
 
 - **构建时报环境变量校验错误**：Dockerfile 已设 `SKIP_ENV_VALIDATION=1`；若仍报错，检查 `next.config.mjs` 是否被改动
 - **migrate 连不上 db**：先 `docker compose up -d db` 并等 healthcheck 通过再迁移
+- **种子模板点生成报错**：占位工作流不能出片，需先在后台粘贴真实工作流（见第三节第 4 步）
+- **封面图加载不出来**：种子封面引用参考站 CDN（res.neoarts.net），正式运营前应把封面转存到自己的 R2 后在后台改 `coverUrl`
 - **生成视频回调失败**：确认 `NEXT_PUBLIC_APP_URL` 是公网 https 且 RunPod worker 能访问到它；回调签名机制见 `docs/COMFYUI-INTEGRATION.md`
 - **改了 `POSTGRES_PASSWORD` 但连不上**：volume 里已有旧密码的初始化数据，需要删 volume 重建（会清库，注意备份）

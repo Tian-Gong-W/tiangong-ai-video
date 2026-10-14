@@ -31,5 +31,6 @@ jobs:
             docker compose build app
             docker compose up -d db
             docker compose --profile tools run --rm migrate
+            docker compose --profile tools run --rm seed
             docker compose up -d app
             docker image prune -f
