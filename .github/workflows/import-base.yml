@@ -1,0 +1,37 @@
+name: Import upstream base
+
+on:
+  push:
+    branches: [Top-Men]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.event.head_commit.message, 'import:') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: Top-Men
+          fetch-depth: 0
+
+      - name: Fetch upstream template
+        run: |
+          git clone --depth 1 https://github.com/wjlbhlbh/videofly-template.git /tmp/base
+          rm -rf /tmp/base/.git
+
+      - name: Overlay upstream tree
+        run: |
+          find . -maxdepth 1 -mindepth 1 -not -name '.git' -not -name '.github' -exec rm -rf {} +
+          rsync -a /tmp/base/ ./
+
+      - name: Commit and push
+        run: |
+          git config user.name "import-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add -A
+          git commit -m "import: videofly-template base (full tree)" --allow-empty
+          git push origin Top-Men
