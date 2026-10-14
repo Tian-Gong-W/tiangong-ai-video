@@ -34,7 +34,7 @@ export const imageToVideoConfig: ToolPageConfig = {
     },
 
     models: {
-      available: ["seedance-1.5-pro", "seedance-1.0-pro-fast", "seedance-1.0-pro-quality"],
+      available: ["comfy-wan22-nsfw", "seedance-1.5-pro", "seedance-1.0-pro-fast", "seedance-1.0-pro-quality"],
       default: "seedance-1.5-pro",
     },
 

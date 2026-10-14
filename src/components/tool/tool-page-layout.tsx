@@ -89,6 +89,7 @@ export function ToolPageLayout({
   const { openModal } = useUpgradeModal();
   const { shouldNotify, markNotified, resetNotification } = useNotificationDeduplication();
   const videoIdFromQuery = searchParams.get("id");
+  const templateKeyFromQuery = searchParams.get("template");
   const NOTIFICATION_ASKED_KEY = "videofly_notification_asked";
   const tNotify = useTranslations("Notifications");
   const tTool = useTranslations("ToolPage");
@@ -107,6 +108,11 @@ export function ToolPageLayout({
     aspectRatio?: string;
     quality?: string;
     imageUrl?: string;
+  } | null>(null);
+  const [templateInfo, setTemplateInfo] = useState<{
+    key: string;
+    name: string;
+    creditsCost: number;
   } | null>(null);
 
   const addGeneratingId = useCallback((videoId: string) => {
@@ -253,6 +259,29 @@ export function ToolPageLayout({
       setUser(session?.data?.user ?? null);
     });
   }, []);
+
+  // 解析 ?template= 参数，加载模板信息（模板模式下生成走 ComfyUI 工作流）
+  useEffect(() => {
+    if (!templateKeyFromQuery) return;
+    let cancelled = false;
+    fetch(`/api/v1/templates?key=${encodeURIComponent(templateKeyFromQuery)}`)
+      .then((res) => res.json())
+      .then((result) => {
+        if (cancelled) return;
+        const tplInfo = result?.data?.templates?.[0];
+        if (tplInfo) {
+          setTemplateInfo({
+            key: tplInfo.templateKey,
+            name: tplInfo.name,
+            creditsCost: tplInfo.creditsCost,
+          });
+        }
+      })
+      .catch((error) => console.warn("Failed to load template info:", error));
+    return () => {
+      cancelled = true;
+    };
+  }, [templateKeyFromQuery]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -457,6 +486,7 @@ export function ToolPageLayout({
           generateAudio: data.generateAudio,
           imageUrls,
           imageUrl,
+          templateId: data.templateId || undefined,
         }),
       });
 
@@ -626,6 +656,9 @@ export function ToolPageLayout({
                     onSubmit={handleSubmit}
                     availableModelIds={config.generator.models.available}
                     defaultModelId={config.generator.models.default}
+                    initialTemplateId={templateInfo?.key}
+                    initialTemplateName={templateInfo?.name}
+                    initialTemplateCredits={templateInfo?.creditsCost}
                     initialPrompt={prefillData?.prompt}
                     initialModelId={prefillData?.model}
                     initialDuration={prefillData?.duration}
@@ -709,6 +742,9 @@ export function ToolPageLayout({
                 onSubmit={handleSubmit}
                 availableModelIds={config.generator.models.available}
                 defaultModelId={config.generator.models.default}
+                initialTemplateId={templateInfo?.key}
+                initialTemplateName={templateInfo?.name}
+                initialTemplateCredits={templateInfo?.creditsCost}
                 initialPrompt={prefillData?.prompt}
                 initialModelId={prefillData?.model}
                 initialDuration={prefillData?.duration}

@@ -11,6 +11,7 @@ import {
   Settings,
   ArrowLeft,
 } from "@/components/ui/icons";
+import { LayoutTemplate } from "lucide-react";
 
 interface AdminSidebarProps {
   locale: string;
@@ -32,6 +33,11 @@ const navItems: NavItem[] = [
     title: "Users",
     href: "/admin/users",
     icon: Users,
+  },
+  {
+    title: "Templates",
+    href: "/admin/templates",
+    icon: LayoutTemplate,
   },
   {
     title: "Analytics",

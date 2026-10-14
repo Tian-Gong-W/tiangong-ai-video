@@ -56,6 +56,9 @@ interface GeneratorPanelProps {
   initialAspectRatio?: string;
   initialQuality?: string;
   initialImageUrl?: string;
+  initialTemplateId?: string;
+  initialTemplateName?: string;
+  initialTemplateCredits?: number;
 }
 
 export interface GeneratorData {
@@ -69,6 +72,7 @@ export interface GeneratorData {
   generateAudio?: boolean;
   imageFile?: File;
   imageUrl?: string;
+  templateId?: string;
   estimatedCredits: number;
 }
 
@@ -84,6 +88,9 @@ export function GeneratorPanel({
   initialAspectRatio,
   initialQuality,
   initialImageUrl,
+  initialTemplateId,
+  initialTemplateName,
+  initialTemplateCredits,
 }: GeneratorPanelProps) {
   const models = getAvailableModels();
   const [prompt, setPrompt] = useState(initialPrompt || "");
@@ -94,6 +101,27 @@ export function GeneratorPanel({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl || null);
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  // 模板模式（来自模板目录 ?template= 跳转）：强制走 comfy-wan22-nsfw + templateId
+  const [template, setTemplate] = useState<{
+    id: string;
+    name?: string;
+    credits?: number;
+  } | null>(
+    initialTemplateId
+      ? { id: initialTemplateId, name: initialTemplateName, credits: initialTemplateCredits }
+      : null
+  );
+
+  // 父组件异步加载模板信息后同步进来
+  useEffect(() => {
+    if (initialTemplateId) {
+      setTemplate({
+        id: initialTemplateId,
+        name: initialTemplateName,
+        credits: initialTemplateCredits,
+      });
+    }
+  }, [initialTemplateId, initialTemplateName, initialTemplateCredits]);
 
   // Filter models based on tool type
   const availableModels = useMemo(() => {
@@ -206,12 +234,13 @@ export function GeneratorPanel({
   }, [currentModel, initialDuration, initialAspectRatio, initialQuality]);
 
   const estimatedCredits = useMemo(() => {
+    if (template?.credits) return template.credits;
     if (!selectedModel) return 0;
     return calculateModelCredits(selectedModel, {
       duration,
       quality: currentModel?.qualities?.includes(quality) ? quality : undefined,
     });
-  }, [selectedModel, duration, quality, currentModel]);
+  }, [selectedModel, duration, quality, currentModel, template]);
 
   const handleSubmit = useCallback(() => {
     if (!currentModel) return;
@@ -223,7 +252,7 @@ export function GeneratorPanel({
 
     const data: GeneratorData = {
       toolType,
-      model: selectedModel,
+      model: template ? "comfy-wan22-nsfw" : selectedModel,
       prompt: prompt.trim(),
       duration,
       aspectRatio,
@@ -231,6 +260,7 @@ export function GeneratorPanel({
       outputNumber: 1,
       imageFile: imageFile || undefined,
       imageUrl: imageUrl || undefined,
+      templateId: template?.id,
       estimatedCredits,
     };
 
@@ -247,6 +277,7 @@ export function GeneratorPanel({
     isLoading,
     toolType,
     onSubmit,
+    template,
     currentModel,
   ]);
 
@@ -305,7 +336,29 @@ export function GeneratorPanel({
             <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
               MODEL
             </span>
-            {currentModel && (
+            {template ? (
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/40 text-sm text-foreground">
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  <span className="max-w-[180px] truncate">
+                    {template.name || template.id}
+                  </span>
+                  {template.credits != null && (
+                    <span className="text-xs text-muted-foreground">
+                      · {template.credits} credits
+                    </span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTemplate(null)}
+                  className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  title="Use standard model instead"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : currentModel && (
                 <DropdownMenu open={isModelDropdownOpen} onOpenChange={setIsModelDropdownOpen}>
                 <DropdownMenuTrigger asChild disabled={isLoading}>
                   <button
