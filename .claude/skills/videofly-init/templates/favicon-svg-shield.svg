@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <path d="M256 16 L480 96 L480 272 Q480 432 256 496 Q32 432 32 272 L32 96 Z"
+    fill="{{PRIMARY_COLOR}}"/>
+  <text x="256" y="270" text-anchor="middle" dominant-baseline="central"
+    font-family="system-ui, -apple-system, 'Segoe UI', sans-serif"
+    font-size="260" font-weight="bold" fill="{{FG_COLOR}}">{{LETTER}}</text>
+</svg>
