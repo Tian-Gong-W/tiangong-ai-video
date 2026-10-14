@@ -1,4 +1,4 @@
-import { VideoStatus, db, videos } from "@/db";
+import { VideoStatus, db, templates, videos } from "@/db";
 import { and, desc, eq, lt } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getStorage } from "@/lib/storage";
@@ -27,6 +27,8 @@ export interface GenerateVideoParams {
   mode?: string;
   outputNumber?: number;
   generateAudio?: boolean;
+  /** ComfyUI 模板 key（可选，缺省用 model 作为模板 key） */
+  templateId?: string;
 }
 
 export interface VideoGenerationResult {
@@ -86,7 +88,7 @@ export class VideoService {
     const effectiveDuration = params.duration || modelConfig.durations[0] || 5;
 
     const outputNumber = Math.max(1, params.outputNumber ?? 1);
-    const creditsRequired = calculateModelCredits(params.model, {
+    let creditsRequired = calculateModelCredits(params.model, {
       duration: effectiveDuration,
       quality: params.quality,
     }) * outputNumber;
@@ -150,6 +152,39 @@ export class VideoService {
       );
     }
 
+    // ComfyUI 自建引擎：从 templates 表解析模板工作流（key 优先用 templateId，缺省用 model）
+    let templateKeyResolved: string | undefined;
+    let templateWorkflow: Record<string, any> | undefined;
+    if (actualProvider === "comfyui") {
+      const templateKey = params.templateId || params.model;
+      const [template] = await db
+        .select()
+        .from(templates)
+        .where(eq(templates.templateKey, templateKey))
+        .limit(1);
+
+      if (!template) {
+        throw new ApiError(`Template not found: ${templateKey}`, 400, {
+          code: "TEMPLATE_NOT_FOUND",
+          templateId: templateKey,
+        });
+      }
+      if (!template.isActive) {
+        throw new ApiError(`Template is inactive: ${templateKey}`, 400, {
+          code: "TEMPLATE_INACTIVE",
+          templateId: templateKey,
+        });
+      }
+
+      templateKeyResolved = template.templateKey;
+      templateWorkflow = template.workflowJson as Record<string, any>;
+
+      // 模板积分优先于模型默认积分
+      if (template.creditsCost > 0) {
+        creditsRequired = template.creditsCost * outputNumber;
+      }
+    }
+
     const videoUuid = `vid_${nanoid(21)}`;
 
     const [videoResult] = await db
@@ -168,6 +203,7 @@ export class VideoService {
           imageUrl: params.imageUrl,
           imageUrls: params.imageUrls,
           generateAudio: params.generateAudio,
+          templateId: templateKeyResolved ?? null,
         },
         status: VideoStatus.PENDING,
         startImageUrl: params.imageUrls?.[0] || params.imageUrl || null,
@@ -246,6 +282,8 @@ export class VideoService {
         mode: resolvedMode,
         outputNumber,
         generateAudio: params.generateAudio,
+        templateId: templateKeyResolved,
+        workflowJson: templateWorkflow,
         callbackUrl,
       });
 

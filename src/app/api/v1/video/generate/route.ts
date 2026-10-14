@@ -17,6 +17,7 @@ const generateSchema = z.object({
   mode: z.string().optional(),
   outputNumber: z.number().int().min(1).optional().default(1),
   generateAudio: z.boolean().optional(),
+  templateId: z.string().min(1).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
       mode: data.mode,
       outputNumber: data.outputNumber,
       generateAudio: data.generateAudio,
+      templateId: data.templateId,
     });
 
     return apiSuccess(result);

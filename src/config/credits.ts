@@ -218,6 +218,16 @@ export const CREDITS_CONFIG = {
             aspectRatios: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"],
             qualities: ["480P", "720P", "1080P"],
           },
+          "comfy-wan22-nsfw": {
+            id: "comfy-wan22-nsfw",
+            name: "Wan 2.2 (ComfyUI)",
+            provider: "comfyui" as const,
+            description: "models.comfywan22.description",
+            supportImageToVideo: true,
+            maxDuration: 10,
+            durations: [5, 10],
+            aspectRatios: ["16:9", "9:16", "1:1"],
+          },
         };
 
         const baseConfig = baseConfigs[modelId];

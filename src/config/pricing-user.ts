@@ -301,6 +301,13 @@ export const VIDEO_MODEL_PRICING: Record<string, VideoModelPricing> = {
     qualityMultiplier: 1.67,
     enabled: false,
   },
+
+  /** Wan 2.2 ComfyUI 自建引擎（模板工作流；积分可被 templates 表 credits_cost 覆盖） */
+  "comfy-wan22-nsfw": {
+    baseCredits: 10,
+    perSecond: 0,
+    enabled: true,
+  },
 };
 
 // ============================================

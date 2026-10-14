@@ -536,6 +536,9 @@ const MODEL_MODE_SUPPORT: Record<
   "seedance-1.0-pro-quality": {
     apimart: ["text-to-video", "image-to-video"],
   },
+  "comfy-wan22-nsfw": {
+    comfyui: ["text-to-video", "image-to-video"],
+  },
 };
 
 // ============================================================================
