@@ -8,6 +8,7 @@ interface AdminTemplate {
   templateKey: string;
   name: string;
   coverUrl: string | null;
+  previewVideoUrl: string | null;
   category: string;
   engine: string;
   workflowJson?: unknown;
@@ -23,6 +24,7 @@ const emptyForm = {
   templateKey: "",
   name: "",
   coverUrl: "",
+  previewVideoUrl: "",
   category: "nsfw-video",
   engine: "comfyui",
   workflowJson: "",
@@ -76,6 +78,7 @@ export default function AdminTemplatesPage() {
         templateKey: t.templateKey,
         name: t.name,
         coverUrl: t.coverUrl || "",
+        previewVideoUrl: t.previewVideoUrl || "",
         category: t.category,
         engine: t.engine,
         workflowJson: JSON.stringify(t.workflowJson, null, 2),
@@ -114,6 +117,7 @@ export default function AdminTemplatesPage() {
         templateKey: form.templateKey.trim(),
         name: form.name.trim(),
         coverUrl: form.coverUrl.trim() || null,
+        previewVideoUrl: form.previewVideoUrl.trim() || null,
         category: form.category.trim() || "nsfw-video",
         engine: form.engine.trim() || "comfyui",
         creditsCost: Number(form.creditsCost) || 10,
@@ -214,6 +218,12 @@ export default function AdminTemplatesPage() {
             placeholder="封面图 URL（可选）"
             value={form.coverUrl}
             onChange={(e) => setForm({ ...form, coverUrl: e.target.value })}
+          />
+          <input
+            className={fieldCls}
+            placeholder="预览视频 URL（可选，mp4/webm，前台 hover 播放）"
+            value={form.previewVideoUrl}
+            onChange={(e) => setForm({ ...form, previewVideoUrl: e.target.value })}
           />
           <input
             className={fieldCls}

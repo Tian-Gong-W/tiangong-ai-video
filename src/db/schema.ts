@@ -345,6 +345,7 @@ export const templates = pgTable(
     templateKey: text("template_key").notNull().unique(),
     name: text("name").notNull(),
     coverUrl: text("cover_url"),
+    previewVideoUrl: text("preview_video_url"),
     category: text("category").notNull().default("nsfw-video"),
     /** ComfyUI API 格式工作流 JSON，支持 <%seed%> <%prompt%> <%image_url%> 等占位符 */
     workflowJson: jsonb("workflow_json").notNull(),

@@ -10,6 +10,7 @@ const templateInputSchema = z.object({
   templateKey: z.string().min(1).max(100),
   name: z.string().min(1).max(200),
   coverUrl: z.string().optional().nullable(),
+  previewVideoUrl: z.string().optional().nullable(),
   category: z.string().default("nsfw-video"),
   engine: z.string().default("comfyui"),
   /** ComfyUI API 格式 JSON：对象或 JSON 字符串均可 */
@@ -46,6 +47,7 @@ export async function GET(request: NextRequest) {
         templateKey: templates.templateKey,
         name: templates.name,
         coverUrl: templates.coverUrl,
+        previewVideoUrl: templates.previewVideoUrl,
         category: templates.category,
         engine: templates.engine,
         creditsCost: templates.creditsCost,
@@ -93,6 +95,7 @@ export async function POST(request: NextRequest) {
         templateKey: data.templateKey,
         name: data.name,
         coverUrl: data.coverUrl || null,
+        previewVideoUrl: data.previewVideoUrl || null,
         category: data.category,
         engine: data.engine,
         workflowJson,

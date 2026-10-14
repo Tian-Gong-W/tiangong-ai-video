@@ -17,6 +17,7 @@ type SeedEntry = {
   key: string;
   name: string;
   cover: string;
+  preview?: string;
   category: string;
   credits: number;
   duration: number;
@@ -93,9 +94,18 @@ async function main() {
           (${e.key}, ${e.name}, ${e.cover}, ${e.category},
            ${JSON.stringify(PLACEHOLDER_WORKFLOW)}::jsonb, 'comfyui',
            ${e.credits}, ${e.duration}, ${e.ratio}, ${e.i2v}, ${e.sort}, true)
+        INSERT INTO templates
+          (template_key, name, cover_url, preview_video_url, category,
+           workflow_json, engine, credits_cost, max_duration, aspect_ratio,
+           support_image_to_video, sort_order, is_active)
+        VALUES
+          (${e.key}, ${e.name}, ${e.cover}, ${e.preview ?? null}, ${e.category},
+           ${JSON.stringify(PLACEHOLDER_WORKFLOW)}::jsonb, 'comfyui',
+           ${e.credits}, ${e.duration}, ${e.ratio}, ${e.i2v}, ${e.sort}, true)
         ON CONFLICT (template_key) DO UPDATE SET
           name = EXCLUDED.name,
           cover_url = EXCLUDED.cover_url,
+          preview_video_url = COALESCE(EXCLUDED.preview_video_url, templates.preview_video_url),
           category = EXCLUDED.category,
           credits_cost = EXCLUDED.credits_cost,
           max_duration = EXCLUDED.max_duration,

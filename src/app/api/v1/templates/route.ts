@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
         templateKey: templates.templateKey,
         name: templates.name,
         coverUrl: templates.coverUrl,
+        previewVideoUrl: templates.previewVideoUrl,
         category: templates.category,
         engine: templates.engine,
         creditsCost: templates.creditsCost,

@@ -10,6 +10,7 @@ const templatePatchSchema = z.object({
   templateKey: z.string().min(1).max(100).optional(),
   name: z.string().min(1).max(200).optional(),
   coverUrl: z.string().optional().nullable(),
+  previewVideoUrl: z.string().optional().nullable(),
   category: z.string().optional(),
   engine: z.string().optional(),
   /** ComfyUI API 格式 JSON：对象或 JSON 字符串均可，缺省表示不更新 */
@@ -95,6 +96,7 @@ export async function PATCH(
     if (data.templateKey !== undefined) updates.templateKey = data.templateKey;
     if (data.name !== undefined) updates.name = data.name;
     if (data.coverUrl !== undefined) updates.coverUrl = data.coverUrl || null;
+    if (data.previewVideoUrl !== undefined) updates.previewVideoUrl = data.previewVideoUrl || null;
     if (data.category !== undefined) updates.category = data.category;
     if (data.engine !== undefined) updates.engine = data.engine;
     if (data.workflowJson !== undefined) updates.workflowJson = normalizeWorkflowJson(data.workflowJson);

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { db, templates } from "@/db";
+import TemplateCardMedia from "./template-card-media";
 
 export const metadata = {
   title: "Templates - AI Video Template Gallery",
@@ -20,6 +21,7 @@ export default async function TemplatesPage({ params }: TemplatesPageProps) {
       templateKey: templates.templateKey,
       name: templates.name,
       coverUrl: templates.coverUrl,
+      previewVideoUrl: templates.previewVideoUrl,
       category: templates.category,
       creditsCost: templates.creditsCost,
       maxDuration: templates.maxDuration,
@@ -70,6 +72,11 @@ export default async function TemplatesPage({ params }: TemplatesPageProps) {
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-primary/20 via-muted to-purple-500/20" />
                   )}
+                  <TemplateCardMedia
+                    coverUrl={t.coverUrl}
+                    previewVideoUrl={t.previewVideoUrl}
+                    name={t.name}
+                  />
                   <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/60 text-xs text-white backdrop-blur">
                     {t.creditsCost} credits
                   </span>
