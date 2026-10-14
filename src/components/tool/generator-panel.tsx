@@ -9,21 +9,16 @@
  * - Uppercase labels for sections
  * - Purple accent color (#6D28D9)
  * - Dashed border upload area
+ *
+ * 前台策略：只暴露"模板选择"，不显示模型下拉。
+ * 模型由模板决定，提交时内部强制 comfy-wan22-nsfw + templateId。
  */
 
 import { useState, useCallback, useMemo, useEffect } from "react";
+import Link from "next/link";
 import { cn } from "@/components/ui";
-import { DEFAULT_VIDEO_MODELS } from "@/components/video-generator";
 import { getAvailableModels, calculateModelCredits } from "@/config/credits";
-import { ChevronDown, X, Sparkles, Image as ImageIcon, Clock, Check } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu";
+import { Sparkles, Image as ImageIcon, X } from "lucide-react";
 
 // ============================================================================
 // Types
@@ -50,6 +45,8 @@ interface GeneratorPanelProps {
   onSubmit?: (data: GeneratorData) => void;
   availableModelIds?: string[];
   defaultModelId?: string;
+  /** 模板目录页链接（带 locale 前缀），未选模板时展示跳转入口 */
+  templatesHref?: string;
   initialPrompt?: string;
   initialModelId?: string;
   initialDuration?: number;
@@ -59,6 +56,8 @@ interface GeneratorPanelProps {
   initialTemplateId?: string;
   initialTemplateName?: string;
   initialTemplateCredits?: number;
+  initialTemplateAspectRatio?: string;
+  initialTemplateMaxDuration?: number;
 }
 
 export interface GeneratorData {
@@ -82,6 +81,7 @@ export function GeneratorPanel({
   onSubmit,
   availableModelIds,
   defaultModelId,
+  templatesHref,
   initialPrompt,
   initialModelId,
   initialDuration,
@@ -91,6 +91,8 @@ export function GeneratorPanel({
   initialTemplateId,
   initialTemplateName,
   initialTemplateCredits,
+  initialTemplateAspectRatio,
+  initialTemplateMaxDuration,
 }: GeneratorPanelProps) {
   const models = getAvailableModels();
   const [prompt, setPrompt] = useState(initialPrompt || "");
@@ -100,15 +102,22 @@ export function GeneratorPanel({
   const [quality, setQuality] = useState(initialQuality || "standard");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl || null);
-  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
-  // 模板模式（来自模板目录 ?template= 跳转）：强制走 comfy-wan22-nsfw + templateId
+  // 模板模式：前台只选模板；模型不暴露，提交时内部强制 comfy-wan22-nsfw
   const [template, setTemplate] = useState<{
     id: string;
     name?: string;
     credits?: number;
+    aspectRatio?: string;
+    maxDuration?: number;
   } | null>(
     initialTemplateId
-      ? { id: initialTemplateId, name: initialTemplateName, credits: initialTemplateCredits }
+      ? {
+          id: initialTemplateId,
+          name: initialTemplateName,
+          credits: initialTemplateCredits,
+          aspectRatio: initialTemplateAspectRatio,
+          maxDuration: initialTemplateMaxDuration,
+        }
       : null
   );
 
@@ -119,11 +128,13 @@ export function GeneratorPanel({
         id: initialTemplateId,
         name: initialTemplateName,
         credits: initialTemplateCredits,
+        aspectRatio: initialTemplateAspectRatio,
+        maxDuration: initialTemplateMaxDuration,
       });
     }
-  }, [initialTemplateId, initialTemplateName, initialTemplateCredits]);
+  }, [initialTemplateId, initialTemplateName, initialTemplateCredits, initialTemplateAspectRatio, initialTemplateMaxDuration]);
 
-  // Filter models based on tool type
+  // Filter models based on tool type（仅作为内部默认值来源，不再展示给用户）
   const availableModels = useMemo(() => {
     const allowList = Array.isArray(availableModelIds) && availableModelIds.length > 0;
     let filtered = allowList
@@ -141,46 +152,20 @@ export function GeneratorPanel({
   );
   const hasAvailableModels = availableModels.length > 0;
 
-  const modelMetadata = useMemo(() => {
-    return new Map(DEFAULT_VIDEO_MODELS.map((model) => [model.id, model]));
-  }, []);
-
-  const getModelIcon = (modelId: string, fallbackName: string) => {
-    const meta = modelMetadata.get(modelId);
-    return meta?.icon ?? fallbackName.charAt(0).toUpperCase();
-  };
-
-  const getModelColor = (modelId: string) => {
-    const meta = modelMetadata.get(modelId);
-    return meta?.color ?? "#71717a";
-  };
-
-  const renderModelIcon = (modelId: string, name: string, size: "sm" | "md" = "sm") => {
-    const icon = getModelIcon(modelId, name);
-    const color = getModelColor(modelId);
-    const sizeClass = size === "sm" ? "w-4 h-4 text-xs" : "w-6 h-6 text-xs";
-
-    if (typeof icon === "string" && (icon.startsWith("http://") || icon.startsWith("https://") || icon.startsWith("/"))) {
-      return (
-        <img
-          src={icon}
-          alt={name}
-          className={cn(sizeClass, "rounded object-cover")}
-        />
-      );
-    }
-
-    return (
-      <span
-        className={cn(sizeClass, "rounded flex items-center justify-center font-bold")}
-        style={{ backgroundColor: color, color: "#fff" }}
-      >
-        {typeof icon === "string" ? icon : name.charAt(0).toUpperCase()}
-      </span>
-    );
-  };
+  // 宽高比/时长选项：模板生效时以模板为准，否则回退到内部默认模型配置
+  const aspectRatioOptions = template?.aspectRatio
+    ? [template.aspectRatio]
+    : currentModel?.aspectRatios ?? [];
+  const durationOptions = template?.maxDuration
+    ? [template.maxDuration]
+    : currentModel?.durations ?? [];
 
   useEffect(() => {
+    if (template) {
+      if (template.aspectRatio) setAspectRatio(template.aspectRatio);
+      if (template.maxDuration) setDuration(template.maxDuration);
+      return;
+    }
     if (!currentModel) return;
 
     if (currentModel.durations && !currentModel.durations.includes(duration)) {
@@ -196,7 +181,7 @@ export function GeneratorPanel({
         setQuality(currentModel.qualities[0] || quality);
       }
     }
-  }, [currentModel, duration, aspectRatio, quality]);
+  }, [template, currentModel, duration, aspectRatio, quality]);
 
   useEffect(() => {
     if (!availableModels.length) return;
@@ -221,7 +206,7 @@ export function GeneratorPanel({
   }, [initialPrompt, initialImageUrl, prompt, imageFile, imageUrl]);
 
   useEffect(() => {
-    if (!currentModel) return;
+    if (!currentModel || template) return;
     if (initialDuration && currentModel.durations?.includes(initialDuration)) {
       setDuration(initialDuration);
     }
@@ -231,7 +216,7 @@ export function GeneratorPanel({
     if (initialQuality && currentModel.qualities?.includes(initialQuality)) {
       setQuality(initialQuality);
     }
-  }, [currentModel, initialDuration, initialAspectRatio, initialQuality]);
+  }, [currentModel, template, initialDuration, initialAspectRatio, initialQuality]);
 
   const estimatedCredits = useMemo(() => {
     if (template?.credits) return template.credits;
@@ -243,6 +228,7 @@ export function GeneratorPanel({
   }, [selectedModel, duration, quality, currentModel, template]);
 
   const handleSubmit = useCallback(() => {
+    if (!template) return; // 前台仅支持模板生成
     if (!currentModel) return;
     const hasPrompt = prompt.trim().length > 0;
     const requiresImage = toolType !== "text-to-video";
@@ -252,7 +238,7 @@ export function GeneratorPanel({
 
     const data: GeneratorData = {
       toolType,
-      model: template ? "comfy-wan22-nsfw" : selectedModel,
+      model: "comfy-wan22-nsfw",
       prompt: prompt.trim(),
       duration,
       aspectRatio,
@@ -260,14 +246,13 @@ export function GeneratorPanel({
       outputNumber: 1,
       imageFile: imageFile || undefined,
       imageUrl: imageUrl || undefined,
-      templateId: template?.id,
+      templateId: template.id,
       estimatedCredits,
     };
 
     onSubmit?.(data);
   }, [
     prompt,
-    selectedModel,
     duration,
     aspectRatio,
     quality,
@@ -296,10 +281,10 @@ export function GeneratorPanel({
 
   const canSubmit = hasAvailableModels &&
     Boolean(currentModel) &&
+    template !== null &&
     prompt.trim().length > 0 &&
     (!((toolType !== "text-to-video") && !imageFile && !imageUrl)) &&
     !isLoading;
-
 
   // Get page title
   const getPageTitle = () => {
@@ -324,18 +309,15 @@ export function GeneratorPanel({
         <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
           {!hasAvailableModels && (
             <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-              No models are currently available for this tool under the active AI
-              provider configuration.
+              No templates are currently available for this tool.
             </div>
           )}
 
           {hasAvailableModels && (
             <>
-          {/* Model Selection */}
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-              MODEL
-            </span>
+          {/* Template Selection — 前台只展示模板，不暴露模型选择 */}
+          <div>
+            <SectionLabel required>TEMPLATE</SectionLabel>
             {template ? (
               <div className="flex items-center gap-2">
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/40 text-sm text-foreground">
@@ -353,63 +335,27 @@ export function GeneratorPanel({
                   type="button"
                   onClick={() => setTemplate(null)}
                   className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  title="Use standard model instead"
+                  title="Clear template"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
-            ) : currentModel && (
-                <DropdownMenu open={isModelDropdownOpen} onOpenChange={setIsModelDropdownOpen}>
-                <DropdownMenuTrigger asChild disabled={isLoading}>
-                  <button
-                    type="button"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-800 hover:bg-zinc-700 transition-colors text-sm text-white"
-                  >
-                    {renderModelIcon(currentModel.id, currentModel.name, "sm")}
-                    <span>{currentModel.name}</span>
-                    <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-zinc-900 border-zinc-800 w-80 max-h-[400px] overflow-y-scroll custom-scrollbar">
-                  <DropdownMenuLabel className="text-zinc-400 text-xs">
-                    Video Models
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator className="bg-zinc-800" />
-                  {availableModels.map((model) => (
-                    <DropdownMenuItem
-                      key={model.id}
-                      data-model-id={model.id}
-                      onClick={() => setSelectedModel(model.id)}
-                      className="text-white hover:bg-zinc-800 flex flex-col items-start py-3"
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-2">
-                          {renderModelIcon(model.id, model.name, "md")}
-                          <span className="font-medium">{model.name}</span>
-                        </div>
-                        {selectedModel === model.id && (
-                          <Check className="w-4 h-4 text-green-500" />
-                        )}
-                      </div>
-                      {model.description && (
-                        <div className="text-xs text-zinc-500 mt-1 ml-8">{model.description}</div>
-                      )}
-                      <div className="text-xs text-zinc-400 mt-1 ml-8 flex items-center gap-2">
-                        {model.maxDuration && (
-                          <>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {model.maxDuration}
-                            </span>
-                            <span>•</span>
-                          </>
-                        )}
-                        <span>{model.creditCost?.base ?? ""} credits</span>
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+            ) : (
+              <div className="space-y-1.5">
+                <Link
+                  href={templatesHref || "/templates"}
+                  onClick={(e) => {
+                    if (isLoading) e.preventDefault();
+                  }}
+                  className="flex items-center justify-center gap-2 w-full h-11 rounded-lg border border-dashed border-primary/50 bg-primary/5 hover:bg-primary/10 text-sm font-medium text-foreground transition-colors"
+                >
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  Browse templates →
+                </Link>
+                <p className="text-xs text-muted-foreground">
+                  Pick a template from the gallery to start generating.
+                </p>
+              </div>
             )}
           </div>
 
@@ -481,12 +427,12 @@ export function GeneratorPanel({
 
           {/* Settings Group */}
           <div className="space-y-5">
-            {/* Aspect Ratio */}
-            {currentModel?.aspectRatios && (
+            {/* Aspect Ratio（模板生效时锁定为模板比例） */}
+            {aspectRatioOptions.length > 0 && (
               <div>
                 <SectionLabel>ASPECT RATIO</SectionLabel>
                 <div className="grid grid-cols-3 gap-3">
-                  {currentModel.aspectRatios.map((ar) => (
+                  {aspectRatioOptions.map((ar) => (
                     <button
                       key={ar}
                       type="button"
@@ -519,11 +465,11 @@ export function GeneratorPanel({
 
             {/* Duration & Quality */}
             <div className="grid grid-cols-2 gap-4">
-              {currentModel?.durations && (
+              {durationOptions.length > 0 && (
                 <div>
                   <SectionLabel>VIDEO LENGTH</SectionLabel>
                   <div className="grid grid-cols-3 gap-2">
-                    {currentModel.durations.map((d) => (
+                    {durationOptions.map((d) => (
                       <button
                         key={d}
                         type="button"
@@ -543,7 +489,8 @@ export function GeneratorPanel({
                 </div>
               )}
 
-              {currentModel?.qualities && (
+              {/* 分辨率由模板工作流决定，模板模式下不再展示 */}
+              {!template && currentModel?.qualities && (
                 <div>
                   <SectionLabel>RESOLUTION</SectionLabel>
                   <div className="grid grid-cols-3 gap-2">
@@ -607,6 +554,12 @@ export function GeneratorPanel({
               </>
             )}
           </button>
+
+          {!template && (
+            <p className="text-xs text-center text-muted-foreground">
+              Select a template to enable generation.
+            </p>
+          )}
         </div>
       </div>
     </div>

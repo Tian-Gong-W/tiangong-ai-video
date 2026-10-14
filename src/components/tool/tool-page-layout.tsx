@@ -113,6 +113,8 @@ export function ToolPageLayout({
     key: string;
     name: string;
     creditsCost: number;
+    aspectRatio: string | null;
+    maxDuration: number | null;
   } | null>(null);
 
   const addGeneratingId = useCallback((videoId: string) => {
@@ -274,6 +276,8 @@ export function ToolPageLayout({
             key: tplInfo.templateKey,
             name: tplInfo.name,
             creditsCost: tplInfo.creditsCost,
+            aspectRatio: tplInfo.aspectRatio ?? null,
+            maxDuration: tplInfo.maxDuration ?? null,
           });
         }
       })
@@ -656,9 +660,12 @@ export function ToolPageLayout({
                     onSubmit={handleSubmit}
                     availableModelIds={config.generator.models.available}
                     defaultModelId={config.generator.models.default}
+                    templatesHref={`/${locale}/templates`}
                     initialTemplateId={templateInfo?.key}
                     initialTemplateName={templateInfo?.name}
                     initialTemplateCredits={templateInfo?.creditsCost}
+                    initialTemplateAspectRatio={templateInfo?.aspectRatio ?? undefined}
+                    initialTemplateMaxDuration={templateInfo?.maxDuration ?? undefined}
                     initialPrompt={prefillData?.prompt}
                     initialModelId={prefillData?.model}
                     initialDuration={prefillData?.duration}
@@ -742,9 +749,12 @@ export function ToolPageLayout({
                 onSubmit={handleSubmit}
                 availableModelIds={config.generator.models.available}
                 defaultModelId={config.generator.models.default}
+                templatesHref={`/${locale}/templates`}
                 initialTemplateId={templateInfo?.key}
                 initialTemplateName={templateInfo?.name}
                 initialTemplateCredits={templateInfo?.creditsCost}
+                initialTemplateAspectRatio={templateInfo?.aspectRatio ?? undefined}
+                initialTemplateMaxDuration={templateInfo?.maxDuration ?? undefined}
                 initialPrompt={prefillData?.prompt}
                 initialModelId={prefillData?.model}
                 initialDuration={prefillData?.duration}
