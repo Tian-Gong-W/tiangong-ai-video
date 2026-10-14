@@ -27,6 +27,20 @@ services:
       db:
         condition: service_healthy
 
+  # 一次性模板种子导入（60 条参考站选品）：docker compose --profile tools run --rm seed
+  seed:
+    build:
+      context: .
+      target: migrate
+    profiles: ["tools"]
+    command: ["pnpm", "exec", "tsx", "scripts/seed-templates.ts"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-tiangong}:${POSTGRES_PASSWORD:-tiangong}@db:5432/${POSTGRES_DB:-tiangong}
+    depends_on:
+      db:
+        condition: service_healthy
+
   app:
     build:
       context: .
