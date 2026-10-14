@@ -23,9 +23,9 @@ export interface SiteConfig {
 }
 
 export const siteConfig: SiteConfig = {
-  name: "VideoFly",
+  name: "Genix AI",
   description: "AI Video Generation Platform - Create stunning videos with Sora 2, Veo 3.1, and more",
-  url: process.env.NEXT_PUBLIC_APP_URL || "https://videofly.app",
+  url: process.env.NEXT_PUBLIC_APP_URL || "https://ai.tian-gong.cc",
   ogImage: "/og.png",
   links: {},
   auth: {

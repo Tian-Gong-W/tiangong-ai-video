@@ -120,8 +120,8 @@ export function LandingHeader({ user }: { user?: User | null }) {
             href="/"
             className="flex items-center gap-2 text-xl font-semibold"
           >
-            <Image src="/logo.svg" alt="VideoFly" width={28} height={28} className="rounded-md" />
-            VideoFly
+            <Image src="/logo.svg" alt="Genix AI" width={28} height={28} className="rounded-md" />
+            Genix AI
           </LocaleLink>
 
           {/* Center Menu - NavigationMenu for better hover */}
@@ -327,8 +327,8 @@ export function LandingHeader({ user }: { user?: User | null }) {
             href="/"
             className="flex items-center gap-2 text-lg font-semibold"
           >
-            <Image src="/logo.svg" alt="VideoFly" width={28} height={28} className="rounded-md" />
-            VideoFly
+            <Image src="/logo.svg" alt="Genix AI" width={28} height={28} className="rounded-md" />
+            Genix AI
           </LocaleLink>
 
           {/* Mobile Menu */}
@@ -357,8 +357,8 @@ export function LandingHeader({ user }: { user?: User | null }) {
                       href="/"
                       className="flex items-center gap-2"
                     >
-                      <Image src="/logo.svg" alt="VideoFly" width={28} height={28} className="rounded-md" />
-            VideoFly
+                      <Image src="/logo.svg" alt="Genix AI" width={28} height={28} className="rounded-md" />
+            Genix AI
                     </LocaleLink>
                   </SheetTitle>
                 </SheetHeader>
