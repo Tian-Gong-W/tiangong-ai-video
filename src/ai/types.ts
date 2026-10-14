@@ -1,6 +1,6 @@
 // AI Video Provider Types
 
-export type ProviderType = "evolink" | "kie" | "apimart";
+export type ProviderType = "evolink" | "kie" | "apimart" | "comfyui";
 
 // Unified video generation parameters
 export interface VideoGenerationParams {
@@ -15,6 +15,10 @@ export interface VideoGenerationParams {
   outputNumber?: number;
   generateAudio?: boolean;
   removeWatermark?: boolean;
+  /** ComfyUI 模板模式：模板 key + 预加载好的工作流 JSON（由服务层查 templates 表注入） */
+  templateId?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  workflowJson?: Record<string, any>;
   callbackUrl?: string;
 }
 

@@ -13,7 +13,7 @@ export async function POST(
     const providerType = provider as ProviderType;
 
     // Validate provider type
-    if (!["evolink", "kie", "apimart"].includes(providerType)) {
+    if (!["evolink", "kie", "apimart", "comfyui"].includes(providerType)) {
       return apiError("Invalid provider", 400);
     }
 

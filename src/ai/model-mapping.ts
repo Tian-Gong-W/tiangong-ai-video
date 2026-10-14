@@ -46,6 +46,7 @@ export interface ModelMapping {
     evolink?: ProviderModelConfig;
     kie?: ProviderModelConfig;
     apimart?: ProviderModelConfig;
+    comfyui?: ProviderModelConfig;
   };
 }
 
@@ -68,6 +69,7 @@ function transformAspectRatio(
   const kieMapping: Record<string, string> = {
     "16:9": "landscape",
     "9:16": "portrait",
+
   };
 
   return kieMapping[value] || value;
@@ -141,7 +143,8 @@ function evolinkParamsTransformer(
     ...params,
     aspect_ratio: params.aspectRatio || "16:9",
     duration: params.duration || 10,
-    remove_watermark: params.removeWatermark ?? true,
+    remove_watermark: par
+ams.removeWatermark ?? true,
     callback_url: params.callbackUrl,
     quality,
     image_urls: imageUrls,
@@ -217,7 +220,8 @@ function kieParamsTransformer(
     }
   }
 
-  baseInput.remove_watermark = params.removeWatermark ?? true;
+  baseInput.remove_watermark = params.removeWatermark
+ ?? true;
 
   // Sora 2 specific parameters
   if (internalModelId === "sora-2") {
@@ -288,7 +292,8 @@ function apimartParamsTransformer(
   }
 
   // Seedance 1.5 Pro
-  if (internalModelId === "seedance-1.5-pro") {
+  if (inte
+rnalModelId === "seedance-1.5-pro") {
     result.resolution =
       normalizeQuality(params.quality, "apimart", internalModelId) || "720p";
     result.audio = params.generateAudio ?? false;
@@ -311,6 +316,21 @@ function apimartParamsTransformer(
 // ============================================================================
 
 export const MODEL_MAPPINGS: Record<string, ModelMapping> = {
+  // -------------------------------------------------------------------------
+  // ComfyUI 自建引擎（RunPod Serverless / 自托管）
+  // workflow JSON 由服务层从 templates 表读取，经 params.workflowJson 注入
+  // -------------------------------------------------------------------------
+  "comfy-wan22-nsfw": {
+    internalId: "comfy-wan22-nsfw",
+    displayName: "Wan 2.2 (ComfyUI)",
+    providers: {
+      comfyui: {
+        providerModelId: (params: any) => params.templateId || "comfy-wan22-nsfw",
+        supported: true,
+      },
+    },
+  },
+
   // -------------------------------------------------------------------------
   // Sora 2
   // -------------------------------------------------------------------------
@@ -348,7 +368,8 @@ export const MODEL_MAPPINGS: Record<string, ModelMapping> = {
             return "wan2.6-reference-video";
           }
           const hasImage =
-            (Array.isArray(params.imageUrls) && params.imageUrls.length > 0) || params.imageUrl;
+            (Array.isArray(params.imageUrls) && params.imageUrls.length > 0) 
+|| params.imageUrl;
           return hasImage ? "wan2.6-image-to-video" : "wan2.6-text-to-video";
         },
         supported: true,
@@ -406,7 +427,8 @@ export const MODEL_MAPPINGS: Record<string, ModelMapping> = {
             callBackUrl: params.callbackUrl,
           };
 
-          if (imageUrls && imageUrls.length > 0) {
+          if (imageU
+rls && imageUrls.length > 0) {
             result.imageUrls = imageUrls;
           }
 
@@ -467,7 +489,8 @@ export const MODEL_MAPPINGS: Record<string, ModelMapping> = {
 
   // -------------------------------------------------------------------------
   // Seedance 1.0 Pro Quality (APImart only)
-  // -------------------------------------------------------------------------
+  // -----------------------------------------
+--------------------------------
   "seedance-1.0-pro-quality": {
     internalId: "seedance-1.0-pro-quality",
     displayName: "Seedance 1.0 Pro Quality",
@@ -539,7 +562,8 @@ export function getProviderModelId(
     );
   }
 
-  const providerModelId = providerConfig.providerModelId;
+  const provide
+rModelId = providerConfig.providerModelId;
 
   // Handle dynamic model IDs (functions)
   if (typeof providerModelId === "function") {
@@ -622,7 +646,8 @@ export function transformParamsForProvider(
   params: Record<string, any>
 ): Record<string, any> {
   const mapping = MODEL_MAPPINGS[internalModelId];
-  if (!mapping) {
+  if (!ma
+pping) {
     throw new Error(`Unknown internal model ID: ${internalModelId}`);
   }
 

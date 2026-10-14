@@ -83,6 +83,7 @@ export const users = pgTable("user", {
 
 export const creemSubscriptions = pgTable(
   "creem_subscriptions",
+
   {
     id: text("id").primaryKey().default(sql`gen_random_uuid()`),
     userId: text("user_id").notNull(),
@@ -141,7 +142,8 @@ export const accounts = pgTable(
   })
 );
 
-export const verifications = pgTable("verification", {
+export const verifications = pgTable("verification
+", {
   id: text("id").primaryKey().default(sql`gen_random_uuid()`),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
@@ -208,7 +210,8 @@ export const k8sClusterConfigs = pgTable(
   "K8sClusterConfig",
   {
     id: serial("id").primaryKey(),
-    name: text("name").notNull(),
+  
+  name: text("name").notNull(),
     location: text("location").notNull(),
     authUserId: text("authUserId").notNull(),
     plan: subscriptionPlanEnum("plan").default("FREE"),
@@ -264,7 +267,8 @@ export const creditHolds = pgTable(
     settledAt: timestamp("settled_at"),
   },
   (table) => ({
-    userIdx: index("credit_holds_user_id_idx").on(table.userId),
+    userIdx: index("credit_h
+olds_user_id_idx").on(table.userId),
     statusIdx: index("credit_holds_status_idx").on(table.status),
     packageIdx: index("credit_holds_package_id_idx").on(table.packageId),
   })
@@ -318,7 +322,8 @@ export const videos = pgTable(
     fileSize: integer("file_size"),
     creditsUsed: integer("credits_used").default(0).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().
+notNull(),
     completedAt: timestamp("completed_at"),
     generationTime: integer("generation_time"),
     isDeleted: boolean("is_deleted").default(false).notNull(),
@@ -329,6 +334,36 @@ export const videos = pgTable(
     createdAtIdx: index("videos_created_at_idx").on(table.createdAt),
   })
 );
+
+// ============================================================================
+// 生成模板（ComfyUI 工作流模板，对标"选模板→出片"模式）
+// ============================================================================
+export const templates = pgTable(
+  "templates",
+  {
+    id: serial("id").primaryKey(),
+    templateKey: text("template_key").notNull().unique(),
+    name: text("name").notNull(),
+    coverUrl: text("cover_url"),
+    category: text("category").notNull().default("nsfw-video"),
+    /** ComfyUI API 格式工作流 JSON，支持 <%seed%> <%prompt%> <%image_url%> 等占位符 */
+    workflowJson: jsonb("workflow_json").notNull(),
+    engine: text("engine").notNull().default("comfyui"),
+    creditsCost: integer("credits_cost").notNull().default(10),
+    maxDuration: integer("max_duration").default(5),
+    aspectRatio: text("aspect_ratio").default("16:9"),
+    supportImageToVideo: boolean("support_image_to_video").default(true).notNull(),
+    sortOrder: integer("sort_order").default(0),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    categoryIdx: index("templates_category_idx").on(table.category),
+    activeIdx: index("templates_is_active_idx").on(table.isActive),
+  })
+);
+export type Template = typeof templates.$inferSelect;
 
 export type Customer = typeof customers.$inferSelect;
 export type BetterAuthUser = typeof users.$inferSelect;
