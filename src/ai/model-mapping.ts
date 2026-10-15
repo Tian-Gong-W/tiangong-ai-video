@@ -143,8 +143,7 @@ function evolinkParamsTransformer(
     ...params,
     aspect_ratio: params.aspectRatio || "16:9",
     duration: params.duration || 10,
-    remove_watermark: par
-ams.removeWatermark ?? true,
+    remove_watermark: params.removeWatermark ?? true,
     callback_url: params.callbackUrl,
     quality,
     image_urls: imageUrls,
@@ -292,8 +291,7 @@ function apimartParamsTransformer(
   }
 
   // Seedance 1.5 Pro
-  if (inte
-rnalModelId === "seedance-1.5-pro") {
+  if (internalModelId === "seedance-1.5-pro") {
     result.resolution =
       normalizeQuality(params.quality, "apimart", internalModelId) || "720p";
     result.audio = params.generateAudio ?? false;
@@ -427,8 +425,7 @@ export const MODEL_MAPPINGS: Record<string, ModelMapping> = {
             callBackUrl: params.callbackUrl,
           };
 
-          if (imageU
-rls && imageUrls.length > 0) {
+          if (imageUrls && imageUrls.length > 0) {
             result.imageUrls = imageUrls;
           }
 
@@ -489,8 +486,7 @@ rls && imageUrls.length > 0) {
 
   // -------------------------------------------------------------------------
   // Seedance 1.0 Pro Quality (APImart only)
-  // -----------------------------------------
---------------------------------
+  // -------------------------------------------------------------------------
   "seedance-1.0-pro-quality": {
     internalId: "seedance-1.0-pro-quality",
     displayName: "Seedance 1.0 Pro Quality",
@@ -565,8 +561,7 @@ export function getProviderModelId(
     );
   }
 
-  const provide
-rModelId = providerConfig.providerModelId;
+  const providerModelId = providerConfig.providerModelId;
 
   // Handle dynamic model IDs (functions)
   if (typeof providerModelId === "function") {
@@ -649,8 +644,7 @@ export function transformParamsForProvider(
   params: Record<string, any>
 ): Record<string, any> {
   const mapping = MODEL_MAPPINGS[internalModelId];
-  if (!ma
-pping) {
+  if (!mapping) {
     throw new Error(`Unknown internal model ID: ${internalModelId}`);
   }
 

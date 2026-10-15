@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db, templates } from "@/db";
 import { apiSuccess, handleApiError } from "@/lib/api/response";
 
@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
         aspectRatio: templates.aspectRatio,
         supportImageToVideo: templates.supportImageToVideo,
         sortOrder: templates.sortOrder,
+        hasBuiltInPrompt: sql<boolean>`(${templates.defaultPrompt} is not null and ${templates.defaultPrompt} <> '')`,
       })
       .from(templates);
 

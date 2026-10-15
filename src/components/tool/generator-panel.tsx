@@ -55,6 +55,8 @@ interface GeneratorPanelProps {
   initialImageUrl?: string;
   initialTemplateId?: string;
   initialTemplateName?: string;
+  initialTemplateCoverUrl?: string;
+  initialTemplateHasBuiltInPrompt?: boolean;
   initialTemplateCredits?: number;
   initialTemplateAspectRatio?: string;
   initialTemplateMaxDuration?: number;
@@ -90,6 +92,8 @@ export function GeneratorPanel({
   initialImageUrl,
   initialTemplateId,
   initialTemplateName,
+  initialTemplateCoverUrl,
+  initialTemplateHasBuiltInPrompt,
   initialTemplateCredits,
   initialTemplateAspectRatio,
   initialTemplateMaxDuration,
@@ -106,17 +110,22 @@ export function GeneratorPanel({
   const [template, setTemplate] = useState<{
     id: string;
     name?: string;
+    coverUrl?: string;
     credits?: number;
     aspectRatio?: string;
     maxDuration?: number;
+    /** 模板是否内置提示词（后台 defaultPrompt 已配置）：内置时隐藏 prompt 输入框 */
+    hasBuiltInPrompt?: boolean;
   } | null>(
     initialTemplateId
       ? {
           id: initialTemplateId,
           name: initialTemplateName,
+          coverUrl: initialTemplateCoverUrl,
           credits: initialTemplateCredits,
           aspectRatio: initialTemplateAspectRatio,
           maxDuration: initialTemplateMaxDuration,
+          hasBuiltInPrompt: initialTemplateHasBuiltInPrompt,
         }
       : null
   );
@@ -127,12 +136,99 @@ export function GeneratorPanel({
       setTemplate({
         id: initialTemplateId,
         name: initialTemplateName,
+        coverUrl: initialTemplateCoverUrl,
         credits: initialTemplateCredits,
         aspectRatio: initialTemplateAspectRatio,
         maxDuration: initialTemplateMaxDuration,
+        hasBuiltInPrompt: initialTemplateHasBuiltInPrompt,
       });
     }
-  }, [initialTemplateId, initialTemplateName, initialTemplateCredits, initialTemplateAspectRatio, initialTemplateMaxDuration]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTemplateId]);
+
+  // 内嵌热门模板条：未选模板时在面板内直接选择（懒加载一次）
+  const [tplList, setTplList] = useState<Array<{
+    templateKey: string;
+    name: string;
+    coverUrl: string | null;
+    creditsCost: number;
+    aspectRatio: string | null;
+    hasBuiltInPrompt: boolean;
+  }>>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/v1/templates", { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((result) => {
+        const list: Array<{
+          templateKey: string;
+          name: string;
+          coverUrl: string | null;
+          previewVideoUrl: string | null;
+          category: string;
+          engine: string;
+          creditsCost: number;
+          maxDuration: number;
+          aspectRatio: string;
+          supportImageToVideo: boolean;
+          sortOrder: number;
+          hasBuiltInPrompt?: boolean;
+        }> = result?.data?.templates ?? [];
+        const filtered =
+          toolType === "text-to-video"
+            ? list
+            : list.filter((t) => t.supportImageToVideo);
+        setTplList(
+          filtered.map((t) => ({
+            templateKey: t.templateKey,
+            name: t.name,
+            coverUrl: t.coverUrl,
+            creditsCost: t.creditsCost,
+            aspectRatio: t.aspectRatio,
+            hasBuiltInPrompt: Boolean(t.hasBuiltInPrompt),
+          }))
+        );
+        // URL 带 ?template= 直达且尚未选中时，用列表数据补全模板信息（含封面）
+        setTemplate((prev) => {
+          if (prev || !initialTemplateId) return prev;
+          const match = filtered.find((t) => t.templateKey === initialTemplateId);
+          if (!match) return prev;
+          return {
+            id: match.templateKey,
+            name: match.name,
+            coverUrl: match.coverUrl ?? undefined,
+            credits: match.creditsCost,
+            aspectRatio: match.aspectRatio ?? undefined,
+            maxDuration: undefined,
+            hasBuiltInPrompt: Boolean(match.hasBuiltInPrompt),
+          };
+        });
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [toolType]);
+
+  const pickTemplate = useCallback(
+    (t: {
+      templateKey: string;
+      name: string;
+      coverUrl: string | null;
+      creditsCost: number;
+      aspectRatio: string | null;
+      hasBuiltInPrompt: boolean;
+    }) => {
+      setTemplate({
+        id: t.templateKey,
+        name: t.name,
+        coverUrl: t.coverUrl ?? undefined,
+        credits: t.creditsCost,
+        aspectRatio: t.aspectRatio ?? undefined,
+        maxDuration: undefined,
+        hasBuiltInPrompt: t.hasBuiltInPrompt,
+      });
+    },
+    []
+  );
 
   // Filter models based on tool type（仅作为内部默认值来源，不再展示给用户）
   const availableModels = useMemo(() => {
@@ -230,10 +326,12 @@ export function GeneratorPanel({
   const handleSubmit = useCallback(() => {
     if (!template) return; // 前台仅支持模板生成
     if (!currentModel) return;
+    const promptIsHidden = Boolean(template.hasBuiltInPrompt);
     const hasPrompt = prompt.trim().length > 0;
     const requiresImage = toolType !== "text-to-video";
     const hasImage = Boolean(imageFile || imageUrl);
-    if (!hasPrompt || isLoading) return;
+    // prompt 内置于模板时允许空 prompt；否则必须填写
+    if ((!hasPrompt && !promptIsHidden) || isLoading) return;
     if (requiresImage && !hasImage) return;
 
     const data: GeneratorData = {
@@ -282,7 +380,7 @@ export function GeneratorPanel({
   const canSubmit = hasAvailableModels &&
     Boolean(currentModel) &&
     template !== null &&
-    prompt.trim().length > 0 &&
+    (prompt.trim().length > 0 || Boolean(template.hasBuiltInPrompt)) &&
     (!((toolType !== "text-to-video") && !imageFile && !imageUrl)) &&
     !isLoading;
 
@@ -319,61 +417,129 @@ export function GeneratorPanel({
           <div>
             <SectionLabel required>TEMPLATE</SectionLabel>
             {template ? (
-              <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/40 text-sm text-foreground">
-                  <Sparkles className="w-3.5 h-3.5 text-primary" />
-                  <span className="max-w-[180px] truncate">
-                    {template.name || template.id}
-                  </span>
+              <div className="rounded-xl border border-border bg-muted/30 overflow-hidden">
+                <div className="relative aspect-[9/16] max-h-[280px] w-full bg-muted">
+                  {template.coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={template.coverUrl}
+                      alt={template.name || template.id}
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Sparkles className="w-8 h-8 text-muted-foreground/40" />
+                    </div>
+                  )}
+                  <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                    {template.maxDuration != null && (
+                      <span className="rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur">
+                        {template.maxDuration}s
+                      </span>
+                    )}
+                    {template.aspectRatio && (
+                      <span className="rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur">
+                        {template.aspectRatio}
+                      </span>
+                    )}
+                  </div>
                   {template.credits != null && (
-                    <span className="text-xs text-muted-foreground">
-                      · {template.credits} credits
+                    <span className="absolute top-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur">
+                      {template.credits} credits
                     </span>
                   )}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setTemplate(null)}
-                  className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  title="Clear template"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                </div>
+                <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-foreground">
+                      {template.name || template.id}
+                    </div>
+                    {template.hasBuiltInPrompt && (
+                      <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Sparkles className="h-3 w-3 text-primary" />
+                        Built-in prompt included
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTemplate(null)}
+                    disabled={isLoading}
+                    className="shrink-0 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                  >
+                    Change
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="space-y-1.5">
+              <div className="space-y-2">
+                {tplList.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {tplList.slice(0, 9).map((t) => (
+                      <button
+                        key={t.templateKey}
+                        type="button"
+                        disabled={isLoading}
+                        onClick={() => pickTemplate(t)}
+                        className="group relative rounded-lg overflow-hidden border border-border bg-muted/40 hover:border-primary/60 transition-colors text-left disabled:opacity-50"
+                        title={t.name}
+                      >
+                        <div className="relative aspect-[9/16] max-h-28 w-full bg-muted">
+                          {t.coverUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={t.coverUrl}
+                              alt={t.name}
+                              loading="lazy"
+                              className="absolute inset-0 h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                            />
+                          )}
+                          <span className="absolute top-1 right-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] text-white backdrop-blur">
+                            {t.creditsCost}
+                          </span>
+                        </div>
+                        <div className="truncate px-1.5 py-1 text-[11px] font-medium text-foreground">
+                          {t.name}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-11 rounded-lg border border-dashed border-border bg-muted/20 text-xs text-muted-foreground">
+                    Loading templates…
+                  </div>
+                )}
                 <Link
                   href={templatesHref || "/templates"}
                   onClick={(e) => {
                     if (isLoading) e.preventDefault();
                   }}
-                  className="flex items-center justify-center gap-2 w-full h-11 rounded-lg border border-dashed border-primary/50 bg-primary/5 hover:bg-primary/10 text-sm font-medium text-foreground transition-colors"
+                  className="flex items-center justify-center gap-1 text-xs text-primary hover:underline"
                 >
-                  <Sparkles className="w-4 h-4 text-primary" />
-                  Browse templates →
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Browse all templates →
                 </Link>
-                <p className="text-xs text-muted-foreground">
-                  Pick a template from the gallery to start generating.
-                </p>
               </div>
             )}
           </div>
 
-          {/* Prompt Section */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <SectionLabel className="mb-0">PROMPT</SectionLabel>
+          {/* Prompt Section — 仅当选中的模板未内置提示词时显示（极简模式：用户只传图） */}
+          {template !== null && !template?.hasBuiltInPrompt && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <SectionLabel className="mb-0">PROMPT</SectionLabel>
+              </div>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Describe the video you want to create, e.g., A cat playing in a sunny garden with natural lighting and fresh atmosphere..."
+                disabled={isLoading}
+                className="w-full min-h-[100px] max-h-[200px] px-4 py-3 rounded-lg bg-muted/40 border border-border text-foreground placeholder:text-muted-foreground/70 resize-none focus:outline-none focus:border-primary transition-colors text-sm leading-relaxed"
+                rows={4}
+                maxLength={2000}
+              />
             </div>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe the video you want to create, e.g., A cat playing in a sunny garden with natural lighting and fresh atmosphere..."
-              disabled={isLoading}
-              className="w-full min-h-[100px] max-h-[200px] px-4 py-3 rounded-lg bg-muted/40 border border-border text-foreground placeholder:text-muted-foreground/70 resize-none focus:outline-none focus:border-primary transition-colors text-sm leading-relaxed"
-              rows={4}
-              maxLength={2000}
-            />
-          </div>
+          )}
 
           {/* Image Upload (for image-to-video) */}
           {(toolType === "image-to-video" || toolType === "reference-to-video") &&
@@ -425,96 +591,6 @@ export function GeneratorPanel({
             )}
 
 
-          {/* Settings Group */}
-          <div className="space-y-5">
-            {/* Aspect Ratio（模板生效时锁定为模板比例） */}
-            {aspectRatioOptions.length > 0 && (
-              <div>
-                <SectionLabel>ASPECT RATIO</SectionLabel>
-                <div className="grid grid-cols-3 gap-3">
-                  {aspectRatioOptions.map((ar) => (
-                    <button
-                      key={ar}
-                      type="button"
-                      onClick={() => setAspectRatio(ar)}
-                      disabled={isLoading}
-                      className={cn(
-                        "aspect-square w-full rounded-lg text-xs font-medium transition-all border flex items-center justify-center",
-                        aspectRatio === ar
-                          ? "bg-primary/10 text-foreground border-primary"
-                          : "bg-muted/40 text-muted-foreground border-border hover:border-muted-foreground/40"
-                      )}
-                    >
-                      <div className="flex flex-col items-center gap-2">
-                        <div className={cn(
-                          "border-2 rounded-sm",
-                          aspectRatio === ar ? "border-primary" : "border-muted-foreground/50",
-                          ar === "16:9" && "w-8 h-4",
-                          ar === "9:16" && "w-4 h-8",
-                          ar === "1:1" && "w-6 h-6",
-                          ar === "4:3" && "w-6 h-4",
-                          ar === "3:4" && "w-4 h-6"
-                        )} />
-                        <span>{ar}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Duration & Quality */}
-            <div className="grid grid-cols-2 gap-4">
-              {durationOptions.length > 0 && (
-                <div>
-                  <SectionLabel>VIDEO LENGTH</SectionLabel>
-                  <div className="grid grid-cols-3 gap-2">
-                    {durationOptions.map((d) => (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => setDuration(d)}
-                        disabled={isLoading}
-                        className={cn(
-                          "h-10 rounded-lg text-sm font-medium transition-all",
-                          duration === d
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
-                        )}
-                      >
-                        {d}s
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 分辨率由模板工作流决定，模板模式下不再展示 */}
-              {!template && currentModel?.qualities && (
-                <div>
-                  <SectionLabel>RESOLUTION</SectionLabel>
-                  <div className="grid grid-cols-3 gap-2">
-                    {currentModel.qualities.map((q) => (
-                      <button
-                        key={q}
-                        type="button"
-                        onClick={() => setQuality(q)}
-                        disabled={isLoading}
-                        className={cn(
-                          "h-10 rounded-lg text-sm font-medium transition-all capitalize",
-                          quality === q
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted/40 text-muted-foreground hover:bg-muted/60"
-                        )}
-                      >
-                        {q}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
             </>
           )}
         </div>

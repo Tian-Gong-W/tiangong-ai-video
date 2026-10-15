@@ -15,6 +15,8 @@ const templatePatchSchema = z.object({
   engine: z.string().optional(),
   /** ComfyUI API 格式 JSON：对象或 JSON 字符串均可，缺省表示不更新 */
   workflowJson: z.unknown().optional(),
+  /** 模板内置提示词（极简模式），null 清空 */
+  defaultPrompt: z.string().max(5000).optional().nullable(),
   creditsCost: z.number().int().positive().optional(),
   maxDuration: z.number().int().positive().optional(),
   aspectRatio: z.string().optional(),
@@ -100,6 +102,7 @@ export async function PATCH(
     if (data.category !== undefined) updates.category = data.category;
     if (data.engine !== undefined) updates.engine = data.engine;
     if (data.workflowJson !== undefined) updates.workflowJson = normalizeWorkflowJson(data.workflowJson);
+    if (data.defaultPrompt !== undefined) updates.defaultPrompt = data.defaultPrompt || null;
     if (data.creditsCost !== undefined) updates.creditsCost = data.creditsCost;
     if (data.maxDuration !== undefined) updates.maxDuration = data.maxDuration;
     if (data.aspectRatio !== undefined) updates.aspectRatio = data.aspectRatio;

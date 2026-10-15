@@ -155,6 +155,7 @@ export class VideoService {
     // ComfyUI 自建引擎：从 templates 表解析模板工作流（key 优先用 templateId，缺省用 model）
     let templateKeyResolved: string | undefined;
     let templateWorkflow: Record<string, any> | undefined;
+    let effectivePrompt = params.prompt;
     if (actualProvider === "comfyui") {
       const templateKey = params.templateId || params.model;
       const [template] = await db
@@ -176,6 +177,18 @@ export class VideoService {
         });
       }
 
+      // 极简模式：用户未填 prompt 时用模板内置提示词；两者都缺则报错
+      if (!effectivePrompt.trim()) {
+        effectivePrompt = (template.defaultPrompt || "").trim();
+      }
+      if (!effectivePrompt) {
+        throw new ApiError(
+          `Prompt is required (template ${template.templateKey} has no default prompt)`,
+          400,
+          { code: "MISSING_PROMPT", templateId: template.templateKey }
+        );
+      }
+
       templateKeyResolved = template.templateKey;
       templateWorkflow = template.workflowJson as Record<string, any>;
 
@@ -192,7 +205,7 @@ export class VideoService {
       .values({
         uuid: videoUuid,
         userId: params.userId,
-        prompt: params.prompt,
+        prompt: effectivePrompt,
         model: params.model,
         parameters: {
           duration: params.duration,
@@ -273,7 +286,7 @@ export class VideoService {
     try {
       const result = await provider.createTask({
         model: params.model,
-        prompt: params.prompt,
+        prompt: effectivePrompt,
         duration: effectiveDuration,  // ✅ 使用计算后的时长
         aspectRatio: params.aspectRatio,
         quality: params.quality,

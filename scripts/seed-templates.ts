@@ -87,14 +87,6 @@ async function main() {
     for (const e of seed) {
       const r = await tx`
         INSERT INTO templates
-          (template_key, name, cover_url, category, workflow_json, engine,
-           credits_cost, max_duration, aspect_ratio, support_image_to_video,
-           sort_order, is_active)
-        VALUES
-          (${e.key}, ${e.name}, ${e.cover}, ${e.category},
-           ${JSON.stringify(PLACEHOLDER_WORKFLOW)}::jsonb, 'comfyui',
-           ${e.credits}, ${e.duration}, ${e.ratio}, ${e.i2v}, ${e.sort}, true)
-        INSERT INTO templates
           (template_key, name, cover_url, preview_video_url, category,
            workflow_json, engine, credits_cost, max_duration, aspect_ratio,
            support_image_to_video, sort_order, is_active)

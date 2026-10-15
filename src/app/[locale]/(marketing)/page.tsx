@@ -1,18 +1,16 @@
-import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
+import { ArrowRight, Image as ImageIcon, Play, Upload, UserRound, WandSparkles } from "lucide-react";
+import Link from "next/link";
 import { db, templates } from "@/db";
 
 import type { Locale } from "@/config/i18n-config";
-import { i18n } from "@/config/i18n-config";
 import { siteConfig } from "@/config/site";
-import { buildAlternates, resolveOgImage } from "@/lib/seo";
-
-import TemplateCardMedia from "./templates/template-card-media";
+import { buildAlternates } from "@/lib/seo";
+import { GenixMobileMenu } from "@/components/genix-mobile-menu";
 
 /**
  * 营销首页门面（Genix AI facade）
- * 结构：hero（chips + 双行大标题 + 双 CTA）→ 六特性卡 → 热门模板条（DB 就绪后自动出现）→ 底部双 CTA
- * 热门模板条查库失败/无数据时静默隐藏，门面本身不依赖数据库。
+ * 富门面（hero 大图 + 六特性卡 + 页脚）+ 热门模板条（DB 就绪后自动出现，失败/为空时静默隐藏）。
  */
 
 interface HomePageProps {
@@ -23,56 +21,40 @@ interface PageMetadataProps {
   params: Promise<{ locale: Locale }>;
 }
 
-const HERO_CHIPS = [
-  "🎞️ Any Image",
-  "🧍 Any Character",
-  "💃 Any Movement",
-  "✨ Creative Freedom",
-];
-
-const FEATURES = [
-  { icon: "📸", title: "Bring Photos to Life" },
-  { icon: "🧍", title: "Create Any Character" },
-  { icon: "🎨", title: "Animate in Any Style" },
-  { icon: "🎬", title: "Cinematic Scenes" },
-  { icon: "💃", title: "Make Any Movement" },
-  { icon: "📦", title: "Turn Any Object to Video" },
-];
-
 export async function generateMetadata({ params }: PageMetadataProps) {
   const { locale } = await params;
-
-  const title = `${siteConfig.name} — Upload Any Image, Make It Move`;
-  const description =
-    "Your Image. Your Imagination. Create any character movement, scene or story. The possibilities are endless.";
-
-  const canonicalUrl = `${siteConfig.url}${locale === i18n.defaultLocale ? "" : `/${locale}`}`;
+  const title = "Genix AI — Upload Any Image, Make It Move";
+  const description = "Bring any image to life with expressive AI video generation.";
   const alternates = buildAlternates("/", locale);
-  const ogImage = resolveOgImage();
-
   return {
     title,
     description,
-    alternates: {
-      canonical: alternates.canonical,
-      languages: alternates.languages,
-    },
-    openGraph: {
-      title,
-      description,
-      url: canonicalUrl,
-      siteName: siteConfig.name,
-      locale: locale === "zh" ? "zh_CN" : "en_US",
-      type: "website",
-      images: ogImage ? [ogImage] : undefined,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: ogImage ? [ogImage] : undefined,
-    },
+    alternates: { canonical: alternates.canonical, languages: alternates.languages },
+    openGraph: { title, description, url: siteConfig.url, siteName: "Genix AI", type: "website" },
   };
+}
+
+const cards = [
+  ["/genix/card-life.png", "Bring Photos to Life"],
+  ["/genix/card-character.png", "Create Any Character"],
+  ["/genix/card-style.png", "Animate in Any Style"],
+  ["/genix/card-cinematic.png", "Cinematic Scenes"],
+  ["/genix/card-movement.png", "Make Any Movement"],
+  ["/genix/card-object.png", "Turn Any Object to Video"],
+];
+
+function GradientText({ children }: { children: React.ReactNode }) {
+  return <span className="genix-gradient-text">{children}</span>;
+}
+
+function CreateButton({ compact = false }: { compact?: boolean }) {
+  return (
+    <Link className={`genix-cta${compact ? " genix-cta-compact" : ""}`} href="/image-to-video">
+      <Upload size={compact ? 15 : 17} strokeWidth={2.4} aria-hidden="true" />
+      <span>Watch Short Drama or Create Video</span>
+      <ArrowRight size={compact ? 17 : 20} strokeWidth={2.5} aria-hidden="true" />
+    </Link>
+  );
 }
 
 export default async function HomePage({ params }: HomePageProps) {
@@ -105,134 +87,213 @@ export default async function HomePage({ params }: HomePageProps) {
     hot = [];
   }
 
-  const createHref = `/${locale}/image-to-video`;
-  const dramaHref = `/${locale}/templates`;
+  const templatesHref = `/${locale}/templates`;
 
   return (
-    <div className="pb-20">
-      {/* Hero */}
-      <section className="relative overflow-hidden px-4 pt-20 pb-14 text-center">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(600px_240px_at_50%_0%,rgba(168,85,247,0.25),transparent_70%)]" />
-        <div className="relative">
-          <div className="mb-7 flex flex-wrap justify-center gap-2">
-            {HERO_CHIPS.map((chip) => (
-              <span
-                key={chip}
-                className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground"
-              >
-                {chip}
-              </span>
-            ))}
+    <div className="genix-page">
+      {/* ── Fixed Header ── */}
+      <header className="genix-header">
+        <Link href="/" className="genix-logo">
+          Genix <GradientText>AI</GradientText>
+        </Link>
+
+        {/* Desktop nav */}
+        <nav className="genix-nav" aria-label="Primary navigation">
+          <Link href="/image-to-video">Create</Link>
+          <Link href="#showcase">Short Films</Link>
+          <Link href={templatesHref}>Gallery</Link>
+          <Link href="#contact">Contact</Link>
+        </nav>
+
+        <div className="genix-header-actions">
+          <Link href="/image-to-video" className="genix-start">
+            Get Started
+          </Link>
+          {/* Mobile hamburger (client component) */}
+          <GenixMobileMenu />
+        </div>
+      </header>
+
+      {/* ── Hero ── */}
+      <section className="genix-hero">
+        {/* Right-side background image (absolute) */}
+        <div className="genix-hero-media" aria-hidden="true">
+          <img src="/genix/hero-room.png" alt="" />
+        </div>
+
+        <div className="genix-container genix-hero-inner">
+          {/* Left copy */}
+          <div className="genix-hero-copy">
+            <h1>
+              Upload <GradientText>Any Image,</GradientText>
+            </h1>
+            <p className="genix-subtitle">And make it move anyway you want</p>
+            <CreateButton />
+            <div className="genix-feature-row">
+              <div>
+                <ImageIcon size={30} strokeWidth={1.8} aria-hidden="true" />
+                <span>Any Image</span>
+              </div>
+              <div>
+                <UserRound size={30} strokeWidth={1.8} aria-hidden="true" />
+                <span>Any Character</span>
+              </div>
+              <div>
+                <WandSparkles size={30} strokeWidth={1.8} aria-hidden="true" />
+                <span>Any Movement</span>
+              </div>
+              <div>
+                <span className="genix-star" aria-hidden="true">
+                  ✦
+                </span>
+                <span>Creative Freedom</span>
+              </div>
+            </div>
           </div>
-          <h1 className="text-4xl font-extrabold leading-[1.15] tracking-tight sm:text-5xl">
-            Upload any image,
-            <br />
-            <span className="bg-gradient-to-r from-purple-500 via-indigo-500 to-sky-400 bg-clip-text text-transparent">
-              make it move anyway you want
+
+          {/* Right floating visual: Polaroid → arrow → video card */}
+          <div className="genix-hero-visual" aria-hidden="true">
+            <figure className="genix-polaroid">
+              <img src="/genix/hero-room.png" alt="" />
+            </figure>
+
+            <span className="genix-flow-arrow">
+              <svg viewBox="0 0 40 24" aria-hidden="true">
+                <path
+                  d="M2 12h30m0 0-8-7m8 7-8 7"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </span>
-          </h1>
-          <p className="mx-auto mt-5 max-w-xl leading-relaxed text-muted-foreground">
-            Your Image. Your Imagination. — Create any character movement, scene
-            or story. The possibilities are endless.
-          </p>
-          <div className="mt-7 flex flex-wrap justify-center gap-3">
-            <Link
-              href={createHref}
-              className="rounded-xl bg-gradient-to-br from-purple-500 to-violet-700 px-7 py-3 text-[15px] font-semibold text-white transition hover:brightness-110"
-            >
-              Create Video
-            </Link>
-            <Link
-              href={dramaHref}
-              className="rounded-xl border border-border px-7 py-3 text-[15px] font-semibold transition hover:bg-white/5"
-            >
-              Watch Short Drama
-            </Link>
+
+            <figure className="genix-video-card">
+              <img src="/genix/hero-room.png" alt="" />
+              <span className="genix-play-btn">
+                <Play size={24} fill="currentColor" aria-hidden="true" />
+              </span>
+              <span className="genix-duration">0:08</span>
+            </figure>
           </div>
         </div>
       </section>
 
-      {/* Your Image. Your Imagination. */}
-      <section className="px-4">
-        <h2 className="text-center text-2xl font-bold">
-          Your Image. Your Imagination.
-        </h2>
-        <p className="mt-2 text-center text-muted-foreground">
-          Create any character movement, scene or story. The possibilities are
-          endless.
-        </p>
-        <div className="mx-auto mt-8 grid max-w-4xl grid-cols-2 gap-4 sm:grid-cols-3">
-          {FEATURES.map((f) => (
-            <div
-              key={f.title}
-              className="rounded-2xl border border-border bg-card p-6 text-center transition hover:border-purple-500/50"
-            >
-              <div className="mb-3 text-3xl">{f.icon}</div>
-              <b className="font-semibold">{f.title}</b>
-            </div>
+      {/* ── Showcase ── */}
+      <section id="showcase" className="genix-showcase">
+        <div className="genix-container">
+          <div className="genix-showcase-heading">
+            <h2>
+              Your Image. <GradientText>Your Imagination.</GradientText>
+            </h2>
+            <p>Create any character movement, scene or story. The possibilities are endless.</p>
+          </div>
+        </div>
+
+        <div className="genix-card-grid">
+          {cards.map(([src, label]) => (
+            <Link href="/image-to-video" className="genix-card" key={src} aria-label={label}>
+              <img src={src} alt={label} />
+              <span className="genix-play-btn">
+                <Play size={21} fill="currentColor" aria-hidden="true" />
+              </span>
+              <span className="genix-card-overlay">
+                <Play size={14} fill="currentColor" aria-hidden="true" />
+                {label}
+              </span>
+            </Link>
           ))}
         </div>
+
+        <div className="genix-showcase-cta">
+          <CreateButton compact />
+        </div>
       </section>
 
-      {/* Hot templates strip（数据库就绪后自动出现） */}
+      {/* ── Hot templates strip（数据库就绪后自动出现） ── */}
       {hot.length > 0 && (
-        <section className="mt-16 px-4">
-          <h2 className="text-center text-2xl font-bold">Hot Templates</h2>
-          <p className="mt-2 text-center text-muted-foreground">
-            Pick a template, describe your scene, and let our AI engine
-            generate the video for you.
-          </p>
-          <div className="mx-auto mt-8 grid max-w-6xl grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <section id="hot-templates" className="genix-showcase">
+          <div className="genix-container">
+            <div className="genix-showcase-heading">
+              <h2>
+                Hot <GradientText>Templates</GradientText>
+              </h2>
+              <p>Pick a template, describe your scene, and let our AI engine generate the video for you.</p>
+            </div>
+          </div>
+
+          <div className="genix-container genix-tpl-grid">
             {hot.map((t) => {
               const ratioClass =
                 t.aspectRatio === "9:16"
-                  ? "aspect-[9/16]"
+                  ? "genix-tpl-916"
                   : t.aspectRatio === "1:1"
-                    ? "aspect-square"
-                    : "aspect-video";
+                    ? "genix-tpl-11"
+                    : "genix-tpl-169";
               return (
                 <Link
                   key={t.templateKey}
-                  href={`/${locale}/image-to-video?template=${encodeURIComponent(
-                    t.templateKey
-                  )}`}
-                  className="group overflow-hidden rounded-2xl border border-border bg-card transition hover:border-primary/60"
+                  href={`/${locale}/image-to-video?template=${encodeURIComponent(t.templateKey)}`}
+                  className="genix-tpl-card"
+                  aria-label={t.name}
                 >
-                  <div className={`relative ${ratioClass} overflow-hidden bg-muted`}>
-                    <TemplateCardMedia
-                      coverUrl={t.coverUrl}
-                      previewVideoUrl={t.previewVideoUrl}
-                      name={t.name}
-                    />
-                    <span className="absolute top-2 right-2 z-10 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white backdrop-blur">
-                      {t.creditsCost} credits
-                    </span>
+                  <div className={`genix-tpl-cover ${ratioClass}`}>
+                    {t.coverUrl ? <img src={t.coverUrl} alt={t.name} loading="lazy" /> : null}
+                    <span className="genix-tpl-credits">{t.creditsCost} credits</span>
                   </div>
-                  <div className="truncate p-3 text-sm font-medium">{t.name}</div>
+                  <div className="genix-tpl-name">{t.name}</div>
                 </Link>
               );
             })}
           </div>
+
+          <div className="genix-showcase-cta">
+            <Link className="genix-cta genix-cta-compact" href={templatesHref}>
+              <span>Browse all templates</span>
+              <ArrowRight size={17} strokeWidth={2.5} aria-hidden="true" />
+            </Link>
+          </div>
         </section>
       )}
 
-      {/* Bottom CTA */}
-      <section className="mt-16 px-4 text-center">
-        <div className="flex flex-wrap justify-center gap-3">
-          <Link
-            href={dramaHref}
-            className="rounded-xl border border-border px-7 py-3 text-[15px] font-semibold transition hover:bg-white/5"
-          >
-            Watch Short Drama
-          </Link>
-          <Link
-            href={createHref}
-            className="rounded-xl bg-gradient-to-br from-purple-500 to-violet-700 px-7 py-3 text-[15px] font-semibold text-white transition hover:brightness-110"
-          >
-            Create Video
-          </Link>
+      {/* ── Footer ── */}
+      <footer id="contact" className="genix-footer">
+        <div className="genix-footer-brand">
+          Genix <GradientText>AI</GradientText>
         </div>
-      </section>
+
+        <nav className="genix-footer-links" aria-label="Footer navigation">
+          <Link href="#">Privacy Policy</Link>
+          <i aria-hidden="true" />
+          <Link href="#">Terms</Link>
+          <i aria-hidden="true" />
+          <Link href="#">Contact</Link>
+        </nav>
+
+        <div className="genix-footer-social">
+          <a href="#" aria-label="YouTube">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="2" y="5" width="20" height="14" rx="4" fill="currentColor" />
+              <path d="M10 9.2l5 2.8-5 2.8z" fill="#070a20" />
+            </svg>
+          </a>
+          <a href="#" aria-label="Instagram">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" strokeWidth="1.9" />
+              <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" strokeWidth="1.9" />
+              <circle cx="17.2" cy="6.8" r="1.2" fill="currentColor" />
+            </svg>
+          </a>
+          <a href="#" aria-label="X / Twitter">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 4l7.2 9.1L4.4 20h2.3l5.6-5.6 4.4 5.6H20l-7.5-9.5L19.4 4h-2.3l-5.2 5.2L8 4z" fill="currentColor" />
+            </svg>
+          </a>
+          <small className="genix-footer-disclaimer">AI-generated content may vary.</small>
+        </div>
+      </footer>
     </div>
   );
 }

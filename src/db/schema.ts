@@ -142,8 +142,7 @@ export const accounts = pgTable(
   })
 );
 
-export const verifications = pgTable("verification
-", {
+export const verifications = pgTable("verification", {
   id: text("id").primaryKey().default(sql`gen_random_uuid()`),
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
@@ -267,8 +266,7 @@ export const creditHolds = pgTable(
     settledAt: timestamp("settled_at"),
   },
   (table) => ({
-    userIdx: index("credit_h
-olds_user_id_idx").on(table.userId),
+    userIdx: index("credit_holds_user_id_idx").on(table.userId),
     statusIdx: index("credit_holds_status_idx").on(table.status),
     packageIdx: index("credit_holds_package_id_idx").on(table.packageId),
   })
@@ -322,8 +320,7 @@ export const videos = pgTable(
     fileSize: integer("file_size"),
     creditsUsed: integer("credits_used").default(0).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().
-notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
     completedAt: timestamp("completed_at"),
     generationTime: integer("generation_time"),
     isDeleted: boolean("is_deleted").default(false).notNull(),
@@ -349,6 +346,8 @@ export const templates = pgTable(
     category: text("category").notNull().default("nsfw-video"),
     /** ComfyUI API 格式工作流 JSON，支持 <%seed%> <%prompt%> <%image_url%> 等占位符 */
     workflowJson: jsonb("workflow_json").notNull(),
+    /** 模板内置提示词：极简模式下用户只传图，提示词由后台在此配置（用户空 prompt 时启用） */
+    defaultPrompt: text("default_prompt"),
     engine: text("engine").notNull().default("comfyui"),
     creditsCost: integer("credits_cost").notNull().default(10),
     maxDuration: integer("max_duration").default(5),

@@ -7,7 +7,8 @@ import { z } from "zod";
 import "@/lib/proxy-config";
 
 const generateSchema = z.object({
-  prompt: z.string().min(1).max(5000),
+  /** 极简模板模式（templateId 存在）允许空 prompt：提示词由模板 defaultPrompt 提供 */
+  prompt: z.string().max(5000).default(""),
   model: z.string().min(1),
   duration: z.number().optional(),
   aspectRatio: z.string().optional(),

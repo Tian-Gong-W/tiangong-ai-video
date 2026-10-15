@@ -15,6 +15,8 @@ const templateInputSchema = z.object({
   engine: z.string().default("comfyui"),
   /** ComfyUI API 格式 JSON：对象或 JSON 字符串均可 */
   workflowJson: z.unknown(),
+  /** 模板内置提示词：极简模式下用户只传图，提示词由模板提供 */
+  defaultPrompt: z.string().max(5000).optional().nullable(),
   creditsCost: z.number().int().positive().default(10),
   maxDuration: z.number().int().positive().default(5),
   aspectRatio: z.string().default("16:9"),
@@ -99,6 +101,7 @@ export async function POST(request: NextRequest) {
         category: data.category,
         engine: data.engine,
         workflowJson,
+        defaultPrompt: data.defaultPrompt || null,
         creditsCost: data.creditsCost,
         maxDuration: data.maxDuration,
         aspectRatio: data.aspectRatio,

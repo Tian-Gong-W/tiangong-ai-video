@@ -12,6 +12,7 @@ interface AdminTemplate {
   category: string;
   engine: string;
   workflowJson?: unknown;
+  defaultPrompt?: string | null;
   creditsCost: number;
   maxDuration: number | null;
   aspectRatio: string | null;
@@ -28,6 +29,7 @@ const emptyForm = {
   category: "nsfw-video",
   engine: "comfyui",
   workflowJson: "",
+  defaultPrompt: "",
   creditsCost: "10",
   maxDuration: "5",
   aspectRatio: "16:9",
@@ -82,6 +84,7 @@ export default function AdminTemplatesPage() {
         category: t.category,
         engine: t.engine,
         workflowJson: JSON.stringify(t.workflowJson, null, 2),
+        defaultPrompt: t.defaultPrompt || "",
         creditsCost: String(t.creditsCost),
         maxDuration: String(t.maxDuration ?? 5),
         aspectRatio: t.aspectRatio || "16:9",
@@ -128,6 +131,7 @@ export default function AdminTemplatesPage() {
         isActive: form.isActive,
       };
       if (wfText) payload.workflowJson = wfText;
+      payload.defaultPrompt = form.defaultPrompt.trim() || null;
 
       const url = editingKey
         ? `/api/v1/admin/templates/${encodeURIComponent(editingKey)}`
@@ -281,6 +285,12 @@ export default function AdminTemplatesPage() {
             启用（前台可见）
           </label>
         </div>
+        <textarea
+          className="w-full min-h-[80px] rounded-md border border-border bg-muted/40 p-3 text-sm text-foreground focus:outline-none focus:border-primary resize-y"
+          placeholder="内置提示词（极简模式：前台用户只传图不出提示词框，生成时自动使用此提示词；留空则要求用户自填）"
+          value={form.defaultPrompt}
+          onChange={(e) => setForm({ ...form, defaultPrompt: e.target.value })}
+        />
         <textarea
           className="w-full min-h-[200px] rounded-md border border-border bg-muted/40 p-3 text-xs font-mono text-foreground focus:outline-none focus:border-primary resize-y"
           placeholder="粘贴 ComfyUI API 格式工作流 JSON（对象或 JSON 字符串均可）"
