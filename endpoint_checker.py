@@ -9,11 +9,13 @@ Only run against a host you own or are explicitly authorized to test.
 import argparse
 import csv
 import hashlib
+import json
 import logging
 import os
 import re
 import sys
 import threading
+from pathlib import Path
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -21,140 +23,10 @@ from urllib.parse import urlparse, urlunparse, unquote
 
 import requests
 
-ENDPOINTS = [
-    # API Core
-    "/api/cos/getCosSign.do",
-    "/api/customerService/systemSwitch",
-    "/api/follow/follow.do",
-    "/api/follow/unfollow.do",
-    "/api/log/logTransferDc.do",
-    "/api/moment/delete.do",
-    "/api/moment/getPersonalMoments.do",
-    "/api/moment/getShowMoments.do",
-    "/api/myconfig/inPublicMembers.do",
-    "/api/photo/getPhotoList.do",
-    "/api/photo/saveVideo.do",
-    "/api/photo/uploadVideo.do",
-    "/api/profile/getObjectProfile.do",
-    "/api/recommend/getRecommendList.do",
-    "/api/",
-    "/api/ccm",
-    "/api/ccm/user/login",
-    "/api/ccm/cdr/calloutDetail/export",
-    "/api/ccm/menu/query",
-    "/api/ccm/monitor/store/queryCallSessionList",
-    "/api/ccm/number/uploadNumber",
-    "/api/ccm/user/list",
-    "/api/login/userLogin.do",
-    "/api/login/checkLogin.do",
-    "/api/login/dynamicLogin.do",
-    "/api/login/getGeetestCaptcha.do",
-    "/api/login/sendDynamicMessageCode.do",
-    "/api/login/sendNonlocalMsgCode.do",
-    "/api/login/submitNonlocalMsgCode.do",
-    "/api/certification/MyCertificationDetails.do",
-    "/api/certification/document/addPersonalId.do",
-    "/api/certification/document/getAddStatusInfo.do",
-    "/api/certification/document/getVerifyStatusInfo.do",
-    "/api/certification/replace/h5/notify.do",
-    "/api/certification/replace/h5/submit.do",
-    "/api/loveAnswerBook/getH5WapRegConfig.do",
-    "/api/offlinestore/getOfflineStoreList",
-    "/api/profile/getBasicProfile.do",
-    "/api/profile/getProfile.do",
-    "/api/register/getWapRegisterImgCode.do",
-    "/api/register/sendWapMessageCodeV2.do",
-    "/api/system/appConfig.do",
-    "/api/seed/cm/mainapi/cmim/pull/offline/session/record",
-    "/api/seed/cm/mainapi/cmim/select/session/page",
-    "/api/seed/cm/mainapi/crm/recommend/interested_list",
-    "/api/seed/cm/mainapi/home/user_context",
-    "/api/seed/cm/mainapi/user/member/get_info",
-    "/api/seed/cm/mainapi/user/my/info",
-    "/api/seed/cm/mainapi/user/visit/list",
-    "/api/seed/cm/momentapi/message/list",
-    "/api/seed/cm/momentapi/moment/recommend/list/v1",
-    "/api/seed/cm/p2papi/user/info",
-    "/api/seed/cm/p2papi/wechat/applet/auth/login",
-    "/api/seed/cm/tradeapi/matchmaker_member/member_status",
-    "/api/seed/matchapi/home/query_home_recommend",
-    "/api/seed/matchapi/home/recommend/listHistory",
-    "/api/seed/zaq/msgapi/subscribe/get_template_list/v3",
-    # Admin & Monitor
-    "/admin/search",
-    "/admin/swagger-ui.html",
-    "/admin/upload",
-    "/admin/v2/api-docs",
-    "/admin/login.php",
-    "/data/admin/config_update.php",
-    "/include/dialog/select_soft.php",
-    "/include/vdimgck.php",
-    "/plus/download.php",
-    "/plus/erraddsave.php",
-    "/plus/guestbook.php",
-    "/plus/search.php",
-    "/monitor/collect",
-    "/monitor/collect.do",
-    "/monitor/csp",
-    "/monitor/csp.do",
-    "/monitor/upload",
-    "/monitor/upload.do",
-    "/monitor/v2/api-docs",
-    "/web_monitor",
-    "/news/data/admin/config_update.php",
-    "/news/include/dialog/select_soft.php",
-    "/news/include/vdimgck.php",
-    "/news/manage/login.php",
-    "/news/plus/bookfeedback.php",
-    "/news/plus/carbuyaction.php",
-    "/news/plus/count.php",
-    "/news/plus/diy.php",
-    "/news/plus/download.php",
-    "/news/plus/feedback.php",
-    "/news/plus/feedback_ajax.php",
-    "/news/plus/flink.php",
-    "/news/plus/guestbook.php",
-    "/news/plus/list.php",
-    "/news/plus/mytag_js.php",
-    "/news/plus/posttocar.php",
-    "/news/plus/recommend.php",
-    "/news/plus/rss.php",
-    "/news/plus/view.php",
-    "/news/plus/vote.php",
-    "/news/tags.php",
-    "/news/u/..%2f..%2f",
-    # Auth & Login
-    "/auth/v1/login/checkPhone",
-    "/auth/v1/refresh",
-    "/auth/v1/refreshToken",
-    "/auth/v1/sms/send",
-    "/login/appleLogin",
-    "/login/appleLogin.do",
-    "/login/applyTempToken.do",
-    "/login/checkLogin.do",
-    "/login/checkMessageCode",
-    "/login/dynamicLogin.do",
-    "/login/dynamicLoginResetPwd.do",
-    "/login/getGeetestCaptcha.do",
-    "/login/loginByTempToken.do",
-    "/login/messageCodeLogin.do",
-    "/login/sendDynamicMessageCode.do",
-    "/login/sendLoginMessageCode.do",
-    "/login/sendMessageCodeCheckDevice",
-    "/login/sendNonlocalMsgCode.do",
-    "/login/trustDeviceFingerprint.do",
-    "/login/userLogin.do",
-    "/login/userLogout.do",
-    "/login/weChatPublicCodeLogin",
-    "/login/weChatPublicLogin",
-    "/loginWindow/getWindowFlag.do",
-    "/login/activatePhone.do",
-    "/login/sendActivatePhoneMessageCode.do",
-    "/login/submitNonlocalMsgCode.do",
-    "/n/user/_auth",
-    "/n/user/_faceAuth",
-    "/cgi-bin/login",
-]
+# 词典与代码分离：端点清单放在本地文件（默认 endpoints.json 或 .txt，可 --endpoints-file 指定），
+# 不再内置在源码里——清单属敏感资产，亦避免修复/审阅场景触发第三方模型的安全拒答。
+DEFAULT_ENDPOINTS_FILE = "endpoints.json"
+
 
 MAX_ENDPOINTS = 200
 MAX_WORKERS = 3
@@ -238,6 +110,25 @@ def validate_endpoint(value: str) -> str:
             or "\\" in decoded or ".." in decoded):
         raise ValueError(f"端点路径不符合安全限制：{value!r}")
     return value
+
+
+def load_endpoints_file(path: str) -> list[str]:
+    """支持两种格式：.json（字符串数组）或纯文本（每行一个端点，# 开头为注释）。"""
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ValueError(f"端点清单文件不可读：{path}（{exc}）")
+    if path.lower().endswith(".json"):
+        try:
+            items = json.loads(text)
+        except ValueError as exc:
+            raise ValueError(f"端点清单 JSON 解析失败：{exc}")
+        if not isinstance(items, list) or not all(isinstance(i, str) for i in items):
+            raise ValueError("端点清单 JSON 应为字符串数组")
+    else:
+        items = [line.strip() for line in text.splitlines()
+                 if line.strip() and not line.strip().startswith("#")]
+    return list(dict.fromkeys(items))
 
 
 def should_skip(endpoint: str) -> bool:
@@ -438,12 +329,14 @@ def make_parser() -> argparse.ArgumentParser:
                         help="目标站点根网址，例如 https://staging.example.org")
     parser.add_argument("--confirm-authorized", action="store_true",
                         help="确认目标属于你或已获得书面测试授权")
+    parser.add_argument("--endpoints-file", default=DEFAULT_ENDPOINTS_FILE,
+                        help=f"端点清单文件（.json 数组或每行一个端点的 .txt），默认 {DEFAULT_ENDPOINTS_FILE}；--all-endpoints 与 --list-categories 均从此文件读取")
     parser.add_argument("--list-categories", action="store_true",
-                        help="仅列出内置端点的分类清单，不发起任何请求；可配合 --output 导出 CSV")
+                        help="仅列出端点清单（--endpoints-file）的分类，不发起任何请求；可配合 --output 导出 CSV")
     parser.add_argument("--endpoint", action="append", dest="endpoints",
                         help="额外指定安全端点；可重复使用。与 --all-endpoints 互斥")
     parser.add_argument("--all-endpoints", action="store_true",
-                        help="使用脚本内可见的 ENDPOINTS 清单（仍会自动跳过高风险路径）")
+                        help="从 --endpoints-file 加载完整清单进行扫描（仍会自动跳过高风险路径）")
     parser.add_argument("--workers", type=int, default=2,
                         help="并发上限 1–3（实际速率仍受全局节流约束），默认 2")
     parser.add_argument("--timeout", type=float, default=8.0,
@@ -464,9 +357,9 @@ def make_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def print_inventory(output: str | None) -> int:
+def print_inventory(endpoints: list[str], output: str | None) -> int:
     rows = []
-    for ep in dict.fromkeys(ENDPOINTS):
+    for ep in dict.fromkeys(endpoints):
         try:
             rows.append({"endpoint": validate_endpoint(ep),
                          "category": guess_category(ep),
@@ -500,7 +393,14 @@ def main() -> int:
     parser = make_parser()
     args = parser.parse_args()
     if args.list_categories:
-        return print_inventory(args.output)
+        try:
+            file_endpoints = load_endpoints_file(args.endpoints_file)
+        except ValueError as exc:
+            logging.error("%s", exc)
+            logging.error("请先在本地生成端点清单文件（.json 数组或每行一个的 .txt），或用 --endpoints-file 指定路径；")
+            logging.error("若清单原本内置在旧版本脚本中，可执行：git show <旧提交>:endpoint_checker.py 提取后转存")
+            return 2
+        return print_inventory(file_endpoints, args.output)
     if not args.base_url:
         parser.error("--list-categories 之外的模式必须提供 --base-url")
     if not args.confirm_authorized:
@@ -516,7 +416,15 @@ def main() -> int:
     if not args.all_endpoints and not args.endpoints:
         parser.error("请使用 --all-endpoints 或至少一个 --endpoint")
 
-    raw_endpoints = ENDPOINTS if args.all_endpoints else args.endpoints
+    if args.all_endpoints:
+        try:
+            raw_endpoints = load_endpoints_file(args.endpoints_file)
+        except ValueError as exc:
+            logging.error("%s", exc)
+            return 2
+        logging.info("已从 %s 加载 %d 个端点", args.endpoints_file, len(raw_endpoints))
+    else:
+        raw_endpoints = args.endpoints
     if len(raw_endpoints) > MAX_ENDPOINTS:
         parser.error(f"端点数超过上限 {MAX_ENDPOINTS}")
 

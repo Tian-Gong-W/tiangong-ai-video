@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 scan_results.csv
 scan_bodies/
+endpoints.json
+endpoints.txt
