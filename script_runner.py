@@ -238,18 +238,28 @@ def fix():
              (data.get("stdout") or "")[-3000:],
              (data.get("stderr") or "")[-3000:],
              code)
+    body = {"model": model,
+            "messages": [{"role": "system", "content": FIX_SYSTEM_PROMPT},
+                         {"role": "user", "content": user_msg}],
+            "temperature": 0.2}
+    max_tokens = os.environ.get("AI_MAX_TOKENS")
+    if max_tokens and max_tokens.isdigit():
+        body["max_tokens"] = int(max_tokens)
     try:
         resp = http_client.post(
             base + "/chat/completions",
             headers={"Authorization": "Bearer " + key},
-            json={"model": model,
-                  "messages": [{"role": "system", "content": FIX_SYSTEM_PROMPT},
-                               {"role": "user", "content": user_msg}],
-                  "temperature": 0.2},
+            json=body,
             timeout=120,
         )
         resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"]
+        message = resp.json()["choices"][0]["message"]
+        content = message.get("content") or ""
+        if not content.strip() and (message.get("reasoning_content") or "").strip():
+            return jsonify({"ok": False,
+                            "error": "推理模型的思维链占满了输出额度，最终修复代码没来得及生成。"
+                                     "解决方案：设置环境变量 AI_MAX_TOKENS=8192（或更大值）后重启，"
+                                     "或改用 NON-thinking 模型（如 deepseek-chat / deepseek-v4-pro）。"}), 502
     except Exception as exc:
         return jsonify({"ok": False, "error": "AI 接口调用失败：" + str(exc)[:300]}), 502
 
