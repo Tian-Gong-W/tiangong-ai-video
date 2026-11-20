@@ -172,6 +172,15 @@ TEXT_HINTS = ("text/", "json", "xml", "javascript", "x-www-form-urlencoded")
 DEFAULT_MAX_BODY = 8192
 PREVIEW_CHARS = 300
 
+CATEGORY_ORDER = ("business", "auth", "admin", "cms", "other")
+CATEGORY_LABELS = {
+    "business": "业务接口",
+    "auth": "认证登录",
+    "admin": "后台/监控",
+    "cms": "遗留CMS",
+    "other": "其他",
+}
+
 _rate_lock = threading.Lock()
 _last_request_at = 0.0
 _thread_local = threading.local()
@@ -217,6 +226,28 @@ def validate_endpoint(value: str) -> str:
 def should_skip(endpoint: str) -> bool:
     segments = {s for s in re.split(r"[/._-]+", unquote(endpoint).lower()) if s}
     return bool(segments & SKIP_SEGMENTS)
+
+
+def guess_category(endpoint: str) -> str:
+    path = unquote(urlparse(endpoint).path).lower()
+    parts = [p for p in path.split("/") if p]
+    first = parts[0] if parts else ""
+    second = parts[1] if len(parts) > 1 else ""
+    if path.startswith("/n/user/"):
+        return "auth"
+    if first in {"auth", "login", "loginwindow", "cgi-bin"}:
+        return "auth"
+    if first == "api" and second in {"login", "register", "certification"}:
+        return "auth"
+    if first == "api" and second == "ccm":
+        return "admin"
+    if first in {"admin", "data", "monitor", "web_monitor", "n"}:
+        return "admin"
+    if first in {"news", "plus", "include"}:
+        return "cms"
+    if first == "api":
+        return "business"
+    return "other"
 
 
 def wait_for_rate_limit() -> None:
@@ -271,6 +302,7 @@ def check_one(session: requests.Session, base_url: str, endpoint: str,
     result = {
         "endpoint": endpoint,
         "url": url,
+        "category": guess_category(endpoint),
         "checked_at_utc": datetime.now(timezone.utc).isoformat(),
         "body_read": False,
         "body_bytes": 0,
@@ -354,7 +386,7 @@ def check_one(session: requests.Session, base_url: str, endpoint: str,
 
 def write_csv(rows: list[dict], filename: str) -> None:
     fields = [
-        "endpoint", "url", "checked_at_utc", "status_code", "status_text",
+        "endpoint", "url", "category", "checked_at_utc", "status_code", "status_text",
         "elapsed_sec", "content_type", "content_length_header", "redirect_location",
         "has_hsts", "has_csp", "has_x_frame_options", "has_x_content_type_options",
         "cors_is_wildcard",
@@ -372,10 +404,12 @@ def make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="对授权范围内的站点进行低速 GET 探测：响应头 + 响应体预览。"
     )
-    parser.add_argument("--base-url", required=True, type=parse_base_url,
+    parser.add_argument("--base-url", type=parse_base_url, default=None,
                         help="目标站点根网址，例如 https://staging.example.org")
     parser.add_argument("--confirm-authorized", action="store_true",
                         help="确认目标属于你或已获得书面测试授权")
+    parser.add_argument("--list-categories", action="store_true",
+                        help="仅列出内置端点的分类清单，不发起任何请求；可配合 --output 导出 CSV")
     parser.add_argument("--endpoint", action="append", dest="endpoints",
                         help="额外指定安全端点；可重复使用。与 --all-endpoints 互斥")
     parser.add_argument("--all-endpoints", action="store_true",
@@ -397,9 +431,39 @@ def make_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def print_inventory(output: str | None) -> int:
+    rows = []
+    for ep in dict.fromkeys(ENDPOINTS):
+        try:
+            rows.append({"endpoint": validate_endpoint(ep),
+                         "category": guess_category(ep)})
+        except ValueError as exc:
+            logging.warning("跳过无效端点：%s", exc)
+    by_category: dict[str, list[str]] = {}
+    for row in rows:
+        by_category.setdefault(row["category"], []).append(row["endpoint"])
+    for category in CATEGORY_ORDER:
+        eps = by_category.get(category, [])
+        logging.info("[%s（%s）] %d 个", category, CATEGORY_LABELS[category], len(eps))
+        for ep in eps:
+            logging.info("    %s", ep)
+    if output:
+        try:
+            write_csv(rows, output)
+            logging.info("分类清单已保存：%s", output)
+        except OSError as exc:
+            logging.error("写入 CSV 失败：%s", exc)
+            return 1
+    return 0
+
+
 def main() -> int:
     parser = make_parser()
     args = parser.parse_args()
+    if args.list_categories:
+        return print_inventory(args.output)
+    if not args.base_url:
+        parser.error("--list-categories 之外的模式必须提供 --base-url")
     if not args.confirm_authorized:
         parser.error("仅对自有或明确授权的目标运行，并添加 --confirm-authorized")
     if not 1 <= args.workers <= MAX_WORKERS:
@@ -472,16 +536,21 @@ def main() -> int:
                     "error": f"worker_error: {str(exc)[:180]}",
                 }
             results.append(row)
+            category = CATEGORY_LABELS.get(row.get("category", "other"), "其他")
             status = row.get("status_code") or row.get("error") or "unknown"
             nbytes = row.get("body_bytes", 0)
             preview = (row.get("body_preview") or "")[:80]
-            print(f"[{index}/{len(active)}] {status} {nbytes}B {endpoint} :: {preview}",
+            print(f"[{index}/{len(active)}] {status} {nbytes}B [{category}] {endpoint} :: {preview}",
                   flush=True)
     except KeyboardInterrupt:
         logging.info("收到 Ctrl-C，取消未开始的任务并保存已完成结果。")
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
 
+    logging.info("分类统计：%s",
+                 ", ".join(
+                     f"{CATEGORY_LABELS.get(cat, cat)}={sum(1 for r in results if r.get('category') == cat)}"
+                     for cat in sorted({r.get("category", "other") for r in results})))
     results.sort(key=lambda row: row["endpoint"])
     try:
         if results:
