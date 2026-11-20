@@ -256,9 +256,27 @@ def fix():
     match = re.search(r"```(?:python)?\s*\n(.*?)```", content, re.S)
     fixed = match.group(1).strip() if match else content.strip()
     lines = content.strip().splitlines()
-    explanation = lines[0][:60] if lines else "已修复"
     if not fixed:
         return jsonify({"ok": False, "error": "AI 未返回有效代码"})
+
+    refusal_hints = ("我无法", "我不能", "无法协助", "对不起，我不能",
+                     "I can't", "I cannot", "cannot assist", "against my")
+    if not match and any(h in content for h in refusal_hints):
+        return jsonify({"ok": False,
+                        "error": "模型拒绝了本次修复（脚本内容触发了它的安全策略）。"
+                                 "建议：换更强的模型；或把脚本里的大段数据块"
+                                 "（如端点词典、URL 列表）拆到独立 JSON/txt 文件由运行时加载，"
+                                 "修复请求只发引擎逻辑，通常就不再触发拒绝。"})
+
+    try:
+        compile(fixed, "<fixed>", "exec")
+    except SyntaxError as exc:
+        return jsonify({"ok": False,
+                        "error": "AI 返回的内容不是可运行的 Python（第一行：" +
+                                 (lines[0][:80] if lines else "") + "，语法错：" + str(exc.msg) +
+                                 "）。多为模型拒答或输出格式错误，建议换个更强的模型重试。"})
+
+    explanation = lines[0][:60] if lines else "已修复"
     return jsonify({"ok": True, "fixed_code": fixed,
                     "explanation": "修复说明：" + explanation})
 
