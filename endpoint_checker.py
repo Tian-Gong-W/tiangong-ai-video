@@ -180,13 +180,20 @@ CATEGORY_LABELS = {
     "cms": "遗留CMS",
     "other": "其他",
 }
+PLATFORM_ORDER = ("h5", "wechat-applet", "pc-web-cms", "shared-gateway")
+PLATFORM_LABELS = {
+    "h5": "手机 H5/Wap",
+    "wechat-applet": "微信小程序",
+    "pc-web-cms": "PC 官网",
+    "shared-gateway": "多端共用网关",
+}
 
 _rate_lock = threading.Lock()
 _last_request_at = 0.0
 _thread_local = threading.local()
 
 
-def get_session() -> requests.Session:
+def get_session(extra_headers: tuple[tuple[str, str], ...] = ()) -> requests.Session:
     """每线程独立 Session，避免连接池/cookie jar 并发写。"""
     session = getattr(_thread_local, "session", None)
     if session is None:
@@ -197,7 +204,17 @@ def get_session() -> requests.Session:
             "Accept-Encoding": "identity",  # 直接拿原始 body，避免压缩
         })
         _thread_local.session = session
+    for name, value in extra_headers:
+        session.headers[name] = value
     return session
+
+
+def parse_header(value: str) -> tuple[str, str]:
+    name, sep, header_value = value.partition(":")
+    name, header_value = name.strip(), header_value.strip()
+    if not sep or not name or " " in name:
+        raise argparse.ArgumentTypeError(f"请求头格式应为 Key: Value：{value!r}")
+    return name, header_value
 
 
 def parse_base_url(value: str) -> str:
@@ -248,6 +265,17 @@ def guess_category(endpoint: str) -> str:
     if first == "api":
         return "business"
     return "other"
+
+
+def guess_platform(endpoint: str) -> str:
+    path = unquote(urlparse(endpoint).path).lower()
+    if "applet" in path or "wechat" in path:
+        return "wechat-applet"
+    if "wap" in path or re.search(r"(^|[^a-z])h5([^a-z]|$)", path):
+        return "h5"
+    if path.startswith(("/news", "/plus", "/include")):
+        return "pc-web-cms"
+    return "shared-gateway"
 
 
 def wait_for_rate_limit() -> None:
@@ -303,6 +331,7 @@ def check_one(session: requests.Session, base_url: str, endpoint: str,
         "endpoint": endpoint,
         "url": url,
         "category": guess_category(endpoint),
+        "platform_hint": guess_platform(endpoint),
         "checked_at_utc": datetime.now(timezone.utc).isoformat(),
         "body_read": False,
         "body_bytes": 0,
@@ -386,7 +415,8 @@ def check_one(session: requests.Session, base_url: str, endpoint: str,
 
 def write_csv(rows: list[dict], filename: str) -> None:
     fields = [
-        "endpoint", "url", "category", "checked_at_utc", "status_code", "status_text",
+        "endpoint", "url", "category", "platform_hint", "checked_at_utc",
+        "status_code", "status_text",
         "elapsed_sec", "content_type", "content_length_header", "redirect_location",
         "has_hsts", "has_csp", "has_x_frame_options", "has_x_content_type_options",
         "cors_is_wildcard",
@@ -424,6 +454,9 @@ def make_parser() -> argparse.ArgumentParser:
                         help="响应体原始内容保存目录，默认 scan_bodies")
     parser.add_argument("--max-body-bytes", type=int, default=DEFAULT_MAX_BODY,
                         help=f"每个端点最多读取的字节数，默认 {DEFAULT_MAX_BODY}")
+    parser.add_argument("--header", action="append", dest="extra_headers",
+                        type=parse_header, metavar="KEY:VALUE",
+                        help="附加请求头，可重复；例如 --header 'User-Agent: Mozilla/5.0 (iPhone)' 模拟某端")
     parser.add_argument("--no-body", action="store_true",
                         help="只取响应头，不读取响应体（回到原行为）")
     parser.add_argument("--include-risky", action="store_true",
@@ -436,7 +469,8 @@ def print_inventory(output: str | None) -> int:
     for ep in dict.fromkeys(ENDPOINTS):
         try:
             rows.append({"endpoint": validate_endpoint(ep),
-                         "category": guess_category(ep)})
+                         "category": guess_category(ep),
+                         "platform_hint": guess_platform(ep)})
         except ValueError as exc:
             logging.warning("跳过无效端点：%s", exc)
     by_category: dict[str, list[str]] = {}
@@ -446,7 +480,12 @@ def print_inventory(output: str | None) -> int:
         eps = by_category.get(category, [])
         logging.info("[%s（%s）] %d 个", category, CATEGORY_LABELS[category], len(eps))
         for ep in eps:
-            logging.info("    %s", ep)
+            logging.info("    %-4s %s", PLATFORM_LABELS[guess_platform(ep)], ep)
+    by_platform: dict[str, int] = {}
+    for row in rows:
+        by_platform[row["platform_hint"]] = by_platform.get(row["platform_hint"], 0) + 1
+    logging.info("端归属统计：%s", ", ".join(
+        f"{PLATFORM_LABELS.get(p, p)}={n}" for p, n in sorted(by_platform.items())))
     if output:
         try:
             write_csv(rows, output)
@@ -517,9 +556,10 @@ def main() -> int:
                  len(active), len(skipped), read_body, args.max_body_bytes)
 
     results = []
+    extra_headers = tuple(args.extra_headers or ())
     pool = ThreadPoolExecutor(max_workers=args.workers)
     future_map = {
-        pool.submit(check_one, get_session(), args.base_url, endpoint,
+        pool.submit(check_one, get_session(extra_headers), args.base_url, endpoint,
                     args.timeout, read_body, args.max_body_bytes, body_dir): endpoint
         for endpoint in active
     }
