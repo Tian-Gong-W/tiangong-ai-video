@@ -259,7 +259,7 @@ def fix():
             return jsonify({"ok": False,
                             "error": "推理模型的思维链占满了输出额度，最终修复代码没来得及生成。"
                                      "解决方案：设置环境变量 AI_MAX_TOKENS=8192（或更大值）后重启，"
-                                     "或改用 NON-thinking 模型（如 deepseek-chat / deepseek-v4-pro）。"}), 502
+                                     "或改用非思考模型（如 deepseek-flash / deepseek-v4-pro）。"}), 502
     except Exception as exc:
         return jsonify({"ok": False, "error": "AI 接口调用失败：" + str(exc)[:300]}), 502
 
